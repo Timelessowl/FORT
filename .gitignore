@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+
+fort/node_modules/
+
+*/.env
