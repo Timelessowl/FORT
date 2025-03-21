@@ -1,9 +1,8 @@
 from django.forms.models import model_to_dict
-from django.shortcuts import render
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from chat.models import Chat
+from back.chat.models import Chat
 
 
 # Create your views here.
