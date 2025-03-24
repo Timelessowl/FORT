@@ -1,0 +1,30 @@
+name: Deploy Docker Container
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+jobs:
+  deploy:
+    runs-on: self-hosted  
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Create .env file
+        run: |
+          cat <<EOF > .env
+          DB_NAME=${{ secrets.DB_NAME }}
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_HOST=${{ secrets.DB_HOST }}
+          DB_PORT=${{ secrets.DB_PORT }}
+          EOF
+      - name: Build and Deploy Containers
+        run: |
+          docker-compose down
+          docker-compose build
+          docker-compose up -d
