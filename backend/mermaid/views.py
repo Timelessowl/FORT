@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from rest_framework import status
 import logging
 
-from back.utils.mermaid_renderer import render_mermaid_to_png, MermaidRenderError
+from utils.mermaid_renderer import render_mermaid_to_png, MermaidRenderError
 
 logger = logging.getLogger(__name__)
 

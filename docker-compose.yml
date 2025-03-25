@@ -40,6 +40,7 @@ services:
     ports:
       - "5433:5433"
     environment:
+      - PGPORT=${DB_PORT}
       - POSTGRES_DB=${DB_NAME}
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
