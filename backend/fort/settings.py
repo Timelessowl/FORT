@@ -42,8 +42,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'backend.chat.apps.ChatConfig',
-    'backend.mermaid.apps.MermaidConfig',
+    'chat.apps.ChatConfig',
+    'mermaid.apps.MermaidConfig',
     'rest_framework',
 ]
 
