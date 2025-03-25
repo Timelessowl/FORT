@@ -16,7 +16,7 @@ import environ
 import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
@@ -42,8 +42,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'back.chat.apps.ChatConfig',
-    'back.mermaid.apps.MermaidConfig',
+    'backend.chat.apps.ChatConfig',
+    'backend.mermaid.apps.MermaidConfig',
     'rest_framework',
 ]
 

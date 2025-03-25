@@ -17,8 +17,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 
-from back.chat.views import ChatAPIView
-from back.mermaid.views import MermaidAPIView
+from backend.chat.views import ChatAPIView
+from backend.mermaid.views import MermaidAPIView
 
 urlpatterns = [
        path('admin/', admin.site.urls),
