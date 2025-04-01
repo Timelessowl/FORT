@@ -35,6 +35,21 @@ ALLOWED_HOSTS = []
 
 # Application definition
 
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'FORT API',
+    'DESCRIPTION': 'API для взаимодействия с ИИ агентом генерации ТЗ',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': True,
+    'SWAGGER_UI_SETTINGS': {
+        'filter': False,
+    },
+    'COMPONENT_SPLIT_REQUEST': True
+}
+
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -45,6 +60,7 @@ INSTALLED_APPS = [
     'chat.apps.ChatConfig',
     'mermaid.apps.MermaidConfig',
     'rest_framework',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
