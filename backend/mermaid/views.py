@@ -4,8 +4,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
 import logging
+import environ
 
 from utils.mermaid_renderer import render_mermaid_to_png, MermaidRenderError
+from utils.dfd_generator import get_access_token, generate_mermaid_dfd_from_description
 from mermaid.serializer import MermaidRequestSerializer, ErrorResponseSerializer
 
 logger = logging.getLogger(__name__)
@@ -16,9 +18,8 @@ class MermaidAPIView(APIView):
         summary='Генерация или изменение Mermaid-диаграммы через ИИ-агента',
         description="""
             Этот эндпоинт позволяет пользователю получить изображение Mermaid-диаграммы в формате PNG, сгенерированное или измененное ИИ-агентом. 
-            Пользователь отправляет обязательный токен (уникальный идентификатор чата) и необязательный текст. 
-            - Если текст не передан (например, первое обращение), ИИ-агент генерирует начальный Mermaid-код на основе предыдущего контекста, связанного с токеном.
-            - Если текст передан, он интерпретируется как инструкция для изменения существующей диаграммы, и ИИ-агент обновляет Mermaid-код.
+            Пользователь отправляет обязательный токен (уникальный идентификатор чата) и текст. 
+            - На основе текста ИИ-агент обновляет Mermaid-код и генерируется диаграмма.
             Сервер рендерит полученный Mermaid-код в изображение PNG и возвращает его клиенту в теле ответа.
             """,
         operation_id='generate_or_update_mermaid_diagram',
@@ -33,11 +34,11 @@ class MermaidAPIView(APIView):
                     },
                     'text': {
                         'type': 'string',
-                        'description': 'Что изменить в текущей диаграмме',
-                        'example': 'Добавь дополнительный блок'
+                        'description': 'Описание диаграммы',
+                        'example': 'Пользователь загружает изображение. Сервер обрабатывает изображение. Результат сохраняется в базу данных.'
                     }
                 },
-                'required': ['token']
+                'required': ['token', 'text']
             }
         },
         responses={
@@ -51,7 +52,7 @@ class MermaidAPIView(APIView):
                     OpenApiExample(
                         name='Пример начальной диаграммы',
                         summary='Генерация новой диаграммы',
-                        description='ИИ-агент создал начальную диаграмму по токену без текста',
+                        description='ИИ-агент создал начальную диаграмму по токену и тексту',
                         value='[Binary PNG data]'
                     ),
                     OpenApiExample(
@@ -95,17 +96,25 @@ class MermaidAPIView(APIView):
 
             if not token:
                 return Response({'error': 'The "token" field is required'}, status=status.HTTP_400_BAD_REQUEST)
+            if not text:
+                return Response({'error': 'The "text" field is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            env = environ.Env()
+            client_id = env('CLIENT_ID')
+            client_secret = env('CLIENT_SECRET')
 
             # ============================================== Вызов агента ==============================================
-            mermaid_code: str = f'await call_agent({token}, {text})'
+            token = get_access_token(client_id, client_secret)
+
+            mermaid_code = generate_mermaid_dfd_from_description(text, token)
             # ============================================== Вызов агента ==============================================
 
             png_bytes: bytes = render_mermaid_to_png(mermaid_code)
 
             return HttpResponse(png_bytes, status=status.HTTP_200_OK, content_type='image/png')
 
-        except ValueError as ve:
-            logger.warning(f'Agent error: {ve}')
+        except SystemExit as se:
+            logger.warning(f'Agent error: {se}')
             return Response({'error': 'Agent error'}, status=status.HTTP_400_BAD_REQUEST)
 
         except MermaidRenderError as e:
