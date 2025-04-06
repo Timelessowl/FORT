@@ -11,7 +11,7 @@ const MyModelAdapter: ChatModelAdapter = {
   async run({ messages, abortSignal }) {
     let token: string | undefined;
 
-    #FIXME
+    //#FIXME
     token = "ce7cbfe4-a388-4fa2-bc53-ba0acce26742"
     if (!token) {
       throw new Error("Token is required for the Mermaid endpoint.");
