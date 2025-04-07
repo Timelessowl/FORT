@@ -19,6 +19,7 @@ from django.urls import path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from chat.views import ChatAPIView
+from chat.mock import ChatMockAPIView
 from mermaid.views import MermaidAPIView
 from mermaid.mock import MermaidMockAPIView
 
@@ -28,6 +29,7 @@ urlpatterns = [
        path('api/v1/mermaid', MermaidAPIView.as_view()),
 
        path('api/v1/mermaid/mock', MermaidMockAPIView.as_view()),
+       path('api/v1/chat/<int:agent_id>/mock', ChatMockAPIView.as_view()),
 
        path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
        path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='docs'),
