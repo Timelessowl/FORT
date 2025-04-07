@@ -1,4 +1,4 @@
-from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
+from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse, OpenApiParameter
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
@@ -14,12 +14,35 @@ class ChatAPIView(APIView):
     @extend_schema(
         summary='Генерация ТЗ через чат с ИИ агентом',
         description="""
-        Этот эндпоинт позволяет пользователю начать или продолжить чат с ИИ-агентом для создания технического задания (ТЗ). 
-        Пользователь отправляет текст сообщения и, при необходимости, токен (уникальный идентификатор чата). 
+        Этот эндпоинт позволяет пользователю начать или продолжить чат с ИИ-агентом для создания технического задания (ТЗ).
+        Номер агента указывается в URL.
+        
+        Пользователь отправляет текст сообщения и, при необходимости, токен (уникальный идентификатор чата).
         Если токен отсутствует (например, при первом сообщении), он генерируется автоматически. 
         Ответ всегда содержит токен для продолжения диалога и текст (вопрос или ТЗ).
         """,
         operation_id='chat_generate_tz',
+        parameters=[
+            OpenApiParameter(
+                name='agent_id',
+                type=int,
+                location=OpenApiParameter.PATH,
+                description='Номер ИИ-агента, с которым нужно взаимодействовать (от 1 до 4, по порядку)',
+                required=True,
+                examples=[
+                    OpenApiExample(
+                        'Пример 1',
+                        summary='Агент 1 для получения общих сведений о ТЗ',
+                        value=1
+                    ),
+                    OpenApiExample(
+                        'Пример 2',
+                        summary='Агент 2 для уточнения цели и задачи проекта',
+                        value=2
+                    ),
+                ],
+            ),
+        ],
         request={
             'application/json': {
                 'type': 'object',
@@ -76,6 +99,12 @@ class ChatAPIView(APIView):
                         value={
                             'error': 'Agent error'
                         }
+                    ),
+                    OpenApiExample(
+                        name='Пример несуществующего агента',
+                        value={
+                            'error': 'Agent with id 99 not found'
+                        }
                     )
                 ]
             ),
@@ -93,8 +122,12 @@ class ChatAPIView(APIView):
             )
         }
     )
-    def post(self, request):
+    def post(self, request, agent_id):
         try:
+            if agent_id not in {1, 2, 3, 4}:
+                return Response({'error': f'Agent with id {agent_id} not found. Available agents: 1, 2, 3, 4'},
+                                status=status.HTTP_400_BAD_REQUEST)
+
             token = request.data.get('token')
             text = request.data.get('text')
 
@@ -105,7 +138,21 @@ class ChatAPIView(APIView):
                 token = str(uuid.uuid4())
 
             # ============================================== Вызов агента ==============================================
-            response_agent = f'call_agent({token}, {text})'
+            response_agent = 'error'
+
+            # Заглушки для разных агентов
+            if agent_id == 1:
+                # Агент для получения общих сведений о проекте
+                response_agent = f"[Агент для получения общих сведений о проекте] Получено сообщение: {text}. Токен: {token}"
+            elif agent_id == 2:
+                # Агент для уточнения цели и задачи проекта
+                response_agent = f"[Агент для уточнения цели и задачи проекта] Анализирую требования: {text}. Токен: {token}"
+            elif agent_id == 3:
+                # Агент для выделения пользовательских групп
+                response_agent = f"[Агент для выделения пользовательских групп] Технический ответ на: {text}. Токен: {token}"
+            elif agent_id == 4:
+                # Агент для формирования основных требований к проекту
+                response_agent = f"[Агент для формирования основных требований к проекту] Генерирую идеи по запросу: {text}. Токен: {token}"
             # ============================================== Вызов агента ==============================================
 
             return Response({'token': token, 'text': response_agent}, status=status.HTTP_200_OK)

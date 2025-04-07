@@ -24,7 +24,7 @@ from mermaid.mock import MermaidMockAPIView
 
 urlpatterns = [
        path('admin/', admin.site.urls),
-       path('api/v1/chat', ChatAPIView.as_view()),
+       path('api/v1/chat/<int:agent_id>', ChatAPIView.as_view()),
        path('api/v1/mermaid', MermaidAPIView.as_view()),
 
        path('api/v1/mermaid/mock', MermaidMockAPIView.as_view()),
