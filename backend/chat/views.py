@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework import status
 import logging
 import uuid
+import environ
 
 from chat.serializer import ChatResponseSerializer, ErrorResponseSerializer
 
@@ -11,6 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 class ChatAPIView(APIView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        env = environ.Env()
+        self.client_id = env('CLIENT_ID')
+        self.client_secret = env('CLIENT_SECRET')
+
     @extend_schema(
         summary='Генерация ТЗ через чат с ИИ агентом',
         description="""

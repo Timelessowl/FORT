@@ -14,6 +14,12 @@ logger = logging.getLogger(__name__)
 
 
 class MermaidAPIView(APIView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        env = environ.Env()
+        self.client_id = env('CLIENT_ID')
+        self.client_secret = env('CLIENT_SECRET')
+
     @extend_schema(
         summary='Генерация или изменение Mermaid-диаграммы через ИИ-агента',
         description="""
@@ -99,14 +105,10 @@ class MermaidAPIView(APIView):
             if not text:
                 return Response({'error': 'The "text" field is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-            env = environ.Env()
-            client_id = env('CLIENT_ID')
-            client_secret = env('CLIENT_SECRET')
-
             # ============================================== Вызов агента ==============================================
-            token = get_access_token(client_id, client_secret)
+            access_token: str = get_access_token(self.client_id, self.client_secret)
 
-            mermaid_code = generate_mermaid_dfd_from_description(text, token)
+            mermaid_code: str = generate_mermaid_dfd_from_description(text, access_token)
             # ============================================== Вызов агента ==============================================
 
             png_bytes: bytes = render_mermaid_to_png(mermaid_code)
