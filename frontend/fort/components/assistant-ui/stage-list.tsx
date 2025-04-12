@@ -1,4 +1,4 @@
-import type { FC } from "react";
+import {FC, useEffect} from "react";
 import { useState } from "react";
 import {
   ThreadListItemPrimitive,
@@ -17,9 +17,17 @@ export const StageList: FC = () => {
 
   const handleNext = () => {
     if (activeStage < stages.length - 1) {
-      setActiveStage((prev) => prev + 1);
+      setActiveStage((prev) => {
+        localStorage.setItem("agentId", String(prev + 1))
+        return prev + 1
+      });
     }
   };
+
+  useEffect(() => {
+    localStorage.setItem("agentId", String(0))
+    localStorage.setItem("type", "text")
+  }, []);
 
   return (
     <ThreadListPrimitive.Root className="flex flex-col items-stretch gap-1.5">

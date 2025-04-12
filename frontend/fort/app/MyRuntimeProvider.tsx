@@ -23,11 +23,23 @@ const MyModelAdapter: ChatModelAdapter = {
       throw new Error("User message text is missing.");
     }
 
+    let apiEndpoint: string;
+    const type = localStorage.getItem('type') || "";
+    const agentId =  Number(localStorage.getItem('agentId') ?? 0) + 1;
+
+    if (type === 'mermaid') {
+      apiEndpoint = '/api/v1/mermaid';
+    } else if (agentId) {
+      apiEndpoint = `/api/v1/chat/${agentId}`;
+    } else {
+      throw new Error("Neither agentId nor mermaid type specified in localStorage");
+    }
+
     const requestBody = { token, text: userText };
 
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://192.168.1.111:8000";
 
-    const response = await fetch(`${backendUrl}/api/v1/mermaid`, {
+    const response = await fetch(`${backendUrl}${apiEndpoint}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody),
@@ -38,12 +50,20 @@ const MyModelAdapter: ChatModelAdapter = {
       const errorData = await response.json();
       throw new Error(errorData.error || "Unknown error occurred");
     }
-    const blob = await response.blob();
-    const imageUrl = URL.createObjectURL(blob);
-    return {
+    if (type === 'mermaid') {
+      const blob = await response.blob();
+      const imageUrl = URL.createObjectURL(blob);
+      return {
         content: [{ type: "image", src: imageUrl }],
         token,
-    };
+      };
+    } else {
+      const data = await response.json();
+      return {
+        content: [{ type: "text", text: data.text }],
+        token,
+      };
+    }
   },
 };
 
