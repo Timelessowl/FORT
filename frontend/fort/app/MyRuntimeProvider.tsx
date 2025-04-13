@@ -1,61 +1,83 @@
 "use client";
- 
+
 import type { ReactNode } from "react";
 import {
   AssistantRuntimeProvider,
   useLocalRuntime,
   type ChatModelAdapter,
 } from "@assistant-ui/react";
- 
+
 const MyModelAdapter: ChatModelAdapter = {
   async run({ messages, abortSignal }) {
-    const response = await fetch("http://localhost:8000/api/chat", {
+    let token: string | undefined;
+
+    //#FIXME
+    token = "ce7cbfe4-a388-4fa2-bc53-ba0acce26742"
+    if (!token) {
+      throw new Error("Token is required for the Mermaid endpoint.");
+    }
+
+    const lastMessage = messages[messages.length - 1];
+    const userText = lastMessage.content?.[0]?.text || "";
+    if (!userText) {
+      throw new Error("User message text is missing.");
+    }
+
+    let apiEndpoint: string;
+    const type = localStorage.getItem('type') || "";
+    const agentId =  Number(localStorage.getItem('agentId') ?? 0) + 1;
+
+    if (type === 'mermaid') {
+      apiEndpoint = '/api/v1/mermaid';
+    } else if (agentId) {
+      apiEndpoint = `/api/v1/chat/${agentId}`;
+    } else {
+      throw new Error("Neither agentId nor mermaid type specified in localStorage");
+    }
+
+    const requestBody = { token, text: userText };
+
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://192.168.1.111:8000";
+
+    const response = await fetch(`${backendUrl}${apiEndpoint}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify(requestBody),
       signal: abortSignal,
     });
 
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error("No response body");
-
-    const decoder = new TextDecoder();
-    let content = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunks = decoder.decode(value).split('\n');
-      for (const chunk of chunks) {
-        if (!chunk.trim()) continue;
-        try {
-          const data = JSON.parse(chunk);
-          if (data.content) {  // Handle content chunks
-            content += data.content;
-          }
-        } catch (e) {
-          console.error("Failed to parse chunk:", chunk);
-        }
-      }
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Unknown error occurred");
     }
-
-    return {
-      content: [{ type: "text", text: content }],
-    };
+    if (type === 'mermaid') {
+      const blob = await response.blob();
+      const imageUrl = URL.createObjectURL(blob);
+      return {
+        content: [{ type: "image", src: imageUrl }],
+        token,
+      };
+    } else {
+      const data = await response.json();
+      return {
+        content: [{ type: "text", text: data.text }],
+        token,
+      };
+    }
   },
 };
- 
+
 export function MyRuntimeProvider({
   children,
 }: Readonly<{
   children: ReactNode;
 }>) {
   const runtime = useLocalRuntime(MyModelAdapter);
- 
+
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       {children}
     </AssistantRuntimeProvider>
   );
 }
+

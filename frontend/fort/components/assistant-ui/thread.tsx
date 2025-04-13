@@ -6,6 +6,7 @@ import {
   ThreadPrimitive,
 } from "@assistant-ui/react";
 import type { FC } from "react";
+import { useState } from "react";
 import {
   ArrowDownIcon,
   CheckIcon,
@@ -15,6 +16,7 @@ import {
   PencilIcon,
   RefreshCwIcon,
   SendHorizontalIcon,
+  ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,8 +24,27 @@ import { Button } from "@/components/ui/button";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 
+const DefaultImageComponent: FC<{ src: string; alt?: string }> = ({
+  src,
+  alt = "",
+}) => {
+  return <img src={src} alt={alt} className="max-w-full h-auto" />;
+};
+
+interface ComposerActionProps {
+  isImageMode: boolean;
+  handleToggle: () => void;
+}
+
+
 export const Thread: FC = () => {
-  return (
+  const [isImageMode, setIsImageMode] = useState(false);
+
+  const handleToggle = () => {
+    setIsImageMode((prev) => !prev);
+  };
+
+    return (
     <ThreadPrimitive.Root
       className="bg-background box-border h-full flex flex-col overflow-hidden"
       style={{
@@ -47,7 +68,7 @@ export const Thread: FC = () => {
 
         <div className="sticky bottom-0 mt-3 flex w-full max-w-[var(--thread-max-width)] flex-col items-center justify-end rounded-t-lg bg-inherit pb-4">
           <ThreadScrollToBottom />
-          <Composer />
+          <Composer isImageMode={isImageMode} handleToggle={handleToggle}/>
         </div>
       </ThreadPrimitive.Viewport>
     </ThreadPrimitive.Root>
@@ -86,12 +107,12 @@ const ThreadWelcomeSuggestions: FC = () => {
     <div className="mt-3 flex w-full items-stretch justify-center gap-4">
       <ThreadPrimitive.Suggestion
         className="hover:bg-muted/80 flex max-w-sm grow basis-0 flex-col items-center justify-center rounded-lg border p-3 transition-colors ease-in"
-        prompt="What is the weather in Tokyo?"
+        prompt="Пользователь загружает изображение. Сервер обрабатывает изображение. Результат сохраняется в базу данных."
         method="replace"
         autoSend
       >
         <span className="line-clamp-2 text-ellipsis text-sm font-semibold">
-          What is the weather in Tokyo?
+          Пример генерации изображения
         </span>
       </ThreadPrimitive.Suggestion>
       <ThreadPrimitive.Suggestion
@@ -108,7 +129,12 @@ const ThreadWelcomeSuggestions: FC = () => {
   );
 };
 
-const Composer: FC = () => {
+interface ComposerProps {
+  isImageMode: boolean;
+  handleToggle: () => void;
+}
+
+const Composer: FC<ComposerProps> = ({ isImageMode, handleToggle }) => {
   return (
     <ComposerPrimitive.Root className="focus-within:border-ring/20 flex w-full flex-wrap items-end rounded-lg border bg-inherit px-2.5 shadow-sm transition-colors ease-in">
       <ComposerPrimitive.Input
@@ -117,14 +143,23 @@ const Composer: FC = () => {
         placeholder="Write a message..."
         className="placeholder:text-muted-foreground max-h-40 flex-grow resize-none border-none bg-transparent px-2 py-4 text-sm outline-none focus:ring-0 disabled:cursor-not-allowed"
       />
-      <ComposerAction />
+
+      <ComposerAction isImageMode={isImageMode} handleToggle={handleToggle} />
     </ComposerPrimitive.Root>
   );
 };
 
-const ComposerAction: FC = () => {
+const ComposerAction: FC<ComposerActionProps> = ({ isImageMode, handleToggle }) => {
   return (
     <>
+      <TooltipIconButton
+        tooltip={isImageMode ? "Generate Image" : "Answer as Text"}
+        variant={isImageMode ? "default" : "outline"}
+        className="my-2.5 size-8 p-2 transition-opacity ease-in mr-2"
+        onClick={handleToggle}
+      >
+        <ImageIcon />
+      </TooltipIconButton>
       <ThreadPrimitive.If running={false}>
         <ComposerPrimitive.Send asChild>
           <TooltipIconButton
@@ -202,7 +237,12 @@ const AssistantMessage: FC = () => {
   return (
     <MessagePrimitive.Root className="grid grid-cols-[auto_auto_1fr] grid-rows-[auto_1fr] relative w-full max-w-[var(--thread-max-width)] py-4">
       <div className="text-foreground max-w-[calc(var(--thread-max-width)*0.8)] break-words leading-7 col-span-2 col-start-2 row-start-1 my-1.5">
-        <MessagePrimitive.Content components={{ Text: MarkdownText }} />
+        <MessagePrimitive.Content
+          components={{
+            Text: MarkdownText,
+            Image: DefaultImageComponent,
+          }}
+        />
       </div>
 
       <AssistantActionBar />
