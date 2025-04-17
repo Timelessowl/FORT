@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 
 export const StageList: FC = () => {
   const stages = [
-    { id: "stage-1", title: "Stage 1: Initiation" },
-    { id: "stage-2", title: "Stage 2: Development" },
-    { id: "stage-3", title: "Stage 3: Completion" },
+    { id: "stage-1", title: "Stage 1: Общее описание" },
+    { id: "stage-2", title: "Stage 2: Цели проекта" },
+    { id: "stage-3", title: "Stage 3: Пользовательские группы" },
+    { id: "stage-4", title: "Stage 4: Требования" },
+    { id: "stage-5", title: "Stage 5: Генерация схем" },
   ];
 
   const [activeStage, setActiveStage] = useState(0);
@@ -18,8 +20,13 @@ export const StageList: FC = () => {
   const handleNext = () => {
     if (activeStage < stages.length - 1) {
       setActiveStage((prev) => {
-        localStorage.setItem("agentId", String(prev + 1))
-        return prev + 1
+        const newState = prev + 1
+        localStorage.setItem("agentId", String(newState))
+        localStorage.setItem("type", "text")
+
+        if (newState === 4)
+          localStorage.setItem("type", "mermaid")
+        return newState
       });
     }
   };
@@ -27,6 +34,7 @@ export const StageList: FC = () => {
   useEffect(() => {
     localStorage.setItem("agentId", String(0))
     localStorage.setItem("type", "text")
+    localStorage.setItem("token", crypto.randomUUID())
   }, []);
 
   return (
