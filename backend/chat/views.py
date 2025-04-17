@@ -6,7 +6,9 @@ import logging
 import uuid
 import environ
 
+from chat.models import AgentResponse
 from chat.serializer import ChatResponseSerializer, ErrorResponseSerializer
+from utils.agents import get_access_token, TzPipeline, call_gigachat
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +19,7 @@ class ChatAPIView(APIView):
         env = environ.Env()
         self.client_id = env('CLIENT_ID')
         self.client_secret = env('CLIENT_SECRET')
+        self.access_token = get_access_token(self.client_id, self.client_secret)
 
     @extend_schema(
         summary='Генерация ТЗ через чат с ИИ агентом',
@@ -143,24 +146,45 @@ class ChatAPIView(APIView):
 
             if not token:
                 token = str(uuid.uuid4())
+            else:
+                try:
+                    uuid.UUID(token)
+                except ValueError:
+                    return Response({'error': 'Invalid token format'}, status=status.HTTP_400_BAD_REQUEST)
 
+            last_response = ""
+            if agent_id > 1:
+                prev_response = AgentResponse.objects.filter(
+                    token=token,
+                    agent_id=agent_id - 1
+                ).order_by('-created_at').first()
+
+                if prev_response:
+                    last_response = prev_response.response
             # ============================================== Вызов агента ==============================================
             response_agent = 'error'
 
-            # Заглушки для разных агентов
+            pipeline = TzPipeline(llm_callable=call_gigachat)
+
             if agent_id == 1:
-                # Агент для получения общих сведений о проекте
-                response_agent = f"[Агент для получения общих сведений о проекте] Получено сообщение: {text}. Токен: {token}"
+                # Агент 1: Общее описание
+                response_agent = pipeline.run_agent("description", last_response, text, self.access_token)
             elif agent_id == 2:
-                # Агент для уточнения цели и задачи проекта
-                response_agent = f"[Агент для уточнения цели и задачи проекта] Анализирую требования: {text}. Токен: {token}"
+                # Агент 2: Цели проекта
+                response_agent = pipeline.run_agent("goals", last_response, text, self.access_token)
             elif agent_id == 3:
-                # Агент для выделения пользовательских групп
-                response_agent = f"[Агент для выделения пользовательских групп] Технический ответ на: {text}. Токен: {token}"
+                # Агент 3: Пользовательские группы
+                response_agent = pipeline.run_agent("users", last_response, text, self.access_token)
             elif agent_id == 4:
-                # Агент для формирования основных требований к проекту
-                response_agent = f"[Агент для формирования основных требований к проекту] Генерирую идеи по запросу: {text}. Токен: {token}"
+                # Агент 4: Требования
+                response_agent = pipeline.run_agent("requirements", last_response, text, self.access_token)
             # ============================================== Вызов агента ==============================================
+
+            AgentResponse.objects.create(
+                token=token,
+                agent_id=agent_id,
+                response=response_agent
+            )
 
             return Response({'token': token, 'text': response_agent}, status=status.HTTP_200_OK)
 
