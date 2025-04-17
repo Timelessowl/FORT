@@ -12,7 +12,7 @@ const MyModelAdapter: ChatModelAdapter = {
     let token: string | undefined;
 
     //#FIXME
-    token = "ce7cbfe4-a388-4fa2-bc53-ba0acce26742"
+    token = localStorage.getItem('token')
     if (!token) {
       throw new Error("Token is required for the Mermaid endpoint.");
     }
