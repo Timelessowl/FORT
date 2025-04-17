@@ -37,7 +37,7 @@ class ChatAPIView(APIView):
                 name='agent_id',
                 type=int,
                 location=OpenApiParameter.PATH,
-                description='Номер ИИ-агента, с которым нужно взаимодействовать (от 1 до 4, по порядку)',
+                description='Номер ИИ-агента, с которым нужно взаимодействовать (от 1 до 4, 6 по порядку)',
                 required=True,
                 examples=[
                     OpenApiExample(
@@ -134,14 +134,14 @@ class ChatAPIView(APIView):
     )
     def post(self, request, agent_id):
         try:
-            if agent_id not in {1, 2, 3, 4}:
-                return Response({'error': f'Agent with id {agent_id} not found. Available agents: 1, 2, 3, 4'},
+            if agent_id not in {1, 2, 3, 4, 6}:
+                return Response({'error': f'Agent with id {agent_id} not found. Available agents: 1, 2, 3, 4, 6'},
                                 status=status.HTTP_400_BAD_REQUEST)
 
             token = request.data.get('token')
             text = request.data.get('text')
 
-            if not text:
+            if not text and agent_id != 6:
                 return Response({'error': 'The \'text\' field is required'}, status=status.HTTP_400_BAD_REQUEST)
 
             if not token:
@@ -178,6 +178,34 @@ class ChatAPIView(APIView):
             elif agent_id == 4:
                 # Агент 4: Требования
                 response_agent = pipeline.run_agent("requirements", last_response, text, self.access_token)
+
+            elif agent_id == 6:
+                all_responses = AgentResponse.objects.filter(
+                    token=token,
+                    agent_id__in=[1, 2, 3, 4]
+                ).order_by('agent_id')
+
+                structured_response = "Собранное техническое задание:\n\n"
+
+                for resp in all_responses:
+                    if resp.agent_id == 1:
+                        section = "1. Общее описание проекта:\n\n"
+                    elif resp.agent_id == 2:
+                        section = "2. Цели и задачи проекта:\n\n"
+                    elif resp.agent_id == 3:
+                        section = "3. Пользовательские группы:\n\n"
+                    elif resp.agent_id == 4:
+                        section = "4. Требования и функционал:\n\n"
+
+                    structured_response += f"{section}{resp.response}\n\n"
+
+                AgentResponse.objects.create(
+                    token=token,
+                    agent_id=agent_id,
+                    response=structured_response
+                )
+
+                return Response({'token': token, 'text': structured_response}, status=status.HTTP_200_OK)
             # ============================================== Вызов агента ==============================================
 
             AgentResponse.objects.create(

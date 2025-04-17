@@ -13,6 +13,7 @@ export const StageList: FC = () => {
     { id: "stage-3", title: "Stage 3: Пользовательские группы" },
     { id: "stage-4", title: "Stage 4: Требования" },
     { id: "stage-5", title: "Stage 5: Генерация схем" },
+    { id: "stage-6", title: "Результат" },
   ];
 
   const [activeStage, setActiveStage] = useState(0);
