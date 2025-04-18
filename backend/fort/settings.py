@@ -34,6 +34,12 @@ CORS_ALLOW_ALL_ORIGINS = True
 # CORS_ALLOWED_ORIGINS = [
 #     # Указать домены и отключить CORS_ALLOW_ALL_ORIGINS
 # ]
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+
 CORS_ALLOW_METHODS = [
     # 'DELETE',
     'GET',
@@ -80,6 +86,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_spectacular',
     'corsheaders',
+    'sslserver',
 ]
 
 MIDDLEWARE = [
