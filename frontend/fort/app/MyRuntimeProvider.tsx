@@ -11,7 +11,6 @@ const MyModelAdapter: ChatModelAdapter = {
   async run({ messages, abortSignal }) {
     let token: string | undefined;
 
-    //#FIXME
     token = localStorage.getItem('token')
     if (!token) {
       throw new Error("Token is required for the Mermaid endpoint.");
@@ -37,7 +36,7 @@ const MyModelAdapter: ChatModelAdapter = {
 
     const requestBody = { token, text: userText };
 
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://192.168.1.111:8000";
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
 
     const response = await fetch(`${backendUrl}${apiEndpoint}`, {
       method: "POST",

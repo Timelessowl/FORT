@@ -30,15 +30,15 @@ SECRET_KEY = 'django-insecure-h=2(9qbc-!bn86pz12m7^jg7@p!wl*4@y(ai@^qeg*kq1q0v_n
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 ALLOWED_HOSTS = ['*']
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = True #FIXME
 # CORS_ALLOWED_ORIGINS = [
-#     # Указать домены и отключить CORS_ALLOW_ALL_ORIGINS
+    # "https://fort.3utilities.com"
 # ]
 
-# SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-# SECURE_SSL_REDIRECT = True
-# SESSION_COOKIE_SECURE = True
-# CSRF_COOKIE_SECURE = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 
 CORS_ALLOW_METHODS = [
     # 'DELETE',
