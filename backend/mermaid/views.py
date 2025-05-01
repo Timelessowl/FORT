@@ -6,9 +6,11 @@ from rest_framework import status
 import logging
 import environ
 
+from chat.models import AgentResponse
 from utils.mermaid_renderer import render_mermaid_to_png, MermaidRenderError
 from utils.dfd_generator import get_access_token, generate_mermaid_dfd_from_description
 from mermaid.serializer import MermaidRequestSerializer, ErrorResponseSerializer
+from utils.tz_critic_agent import TzPipeline, call_gigachat
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +26,8 @@ class MermaidAPIView(APIView):
         summary='Генерация или изменение Mermaid-диаграммы через ИИ-агента',
         description="""
             Этот эндпоинт позволяет пользователю получить изображение Mermaid-диаграммы в формате PNG, сгенерированное или измененное ИИ-агентом. 
-            Пользователь отправляет обязательный токен (уникальный идентификатор чата) и текст. 
-            - На основе текста ИИ-агент обновляет Mermaid-код и генерируется диаграмма.
+            Пользователь отправляет обязательный токен (уникальный идентификатор чата). 
+            - На основе токена ИИ-агент обновляет Mermaid-код и генерируется диаграмма.
             Сервер рендерит полученный Mermaid-код в изображение PNG и возвращает его клиенту в теле ответа.
             """,
         operation_id='generate_or_update_mermaid_diagram',
@@ -37,14 +39,9 @@ class MermaidAPIView(APIView):
                         'type': 'string',
                         'description': 'Уникальный идентификатор чата',
                         'example': '550e8400-e29b-41d4-a716-446655440000'
-                    },
-                    'text': {
-                        'type': 'string',
-                        'description': 'Описание диаграммы',
-                        'example': 'Пользователь загружает изображение. Сервер обрабатывает изображение. Результат сохраняется в базу данных.'
                     }
                 },
-                'required': ['token', 'text']
+                'required': ['token']
             }
         },
         responses={
@@ -98,17 +95,35 @@ class MermaidAPIView(APIView):
     def post(self, request):
         try:
             token = request.data.get('token')
-            text = request.data.get('text')
 
             if not token:
                 return Response({'error': 'The "token" field is required'}, status=status.HTTP_400_BAD_REQUEST)
-            if not text:
-                return Response({'error': 'The "text" field is required'}, status=status.HTTP_400_BAD_REQUEST)
 
             # ============================================== Вызов агента ==============================================
             access_token: str = get_access_token(self.client_id, self.client_secret)
+            pipeline = TzPipeline(llm_callable=call_gigachat)
 
-            mermaid_code: str = generate_mermaid_dfd_from_description(text, access_token)
+            all_responses = AgentResponse.objects.filter(
+                token=token,
+                agent_id__in=[1, 2, 3, 4]
+            ).order_by('agent_id', '-created_at').distinct('agent_id')
+
+            structured_response = "Собранное техническое задание:\n\n"
+
+            for resp in all_responses:
+                if resp.agent_id == 1:
+                    section = "1. Общее описание проекта:\n\n"
+                elif resp.agent_id == 2:
+                    section = "2. Цели и задачи проекта:\n\n"
+                elif resp.agent_id == 3:
+                    section = "3. Пользовательские группы:\n\n"
+                elif resp.agent_id == 4:
+                    section = "4. Требования и функционал:\n\n"
+
+                structured_response += f"{section}{resp.response}\n\n"
+
+            # mermaid_code: str = generate_mermaid_dfd_from_description(text, access_token)
+            mermaid_code = pipeline.generate_mermaid_diagram(structured_response, access_token)
             # ============================================== Вызов агента ==============================================
 
             png_bytes: bytes = render_mermaid_to_png(mermaid_code)

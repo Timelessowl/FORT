@@ -8,7 +8,7 @@ import environ
 
 from chat.models import AgentResponse
 from chat.serializer import ChatResponseSerializer, ErrorResponseSerializer
-from utils.agents import get_access_token, TzPipeline, call_gigachat
+from utils.tz_critic_agent import get_access_token, TzPipeline, call_gigachat
 
 logger = logging.getLogger(__name__)
 
@@ -135,8 +135,7 @@ class ChatAPIView(APIView):
     def post(self, request, agent_id):
         try:
             if agent_id not in {1, 2, 3, 4, 6}:
-                return Response({'error': f'Agent with id {agent_id} not found. Available agents: 1, 2, 3, 4, 6'},
-                                status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': f'Agent with id {agent_id} not found. Available agents: 1, 2, 3, 4, 6'}, status=status.HTTP_400_BAD_REQUEST)
 
             token = request.data.get('token')
             text = request.data.get('text')
@@ -153,14 +152,19 @@ class ChatAPIView(APIView):
                     return Response({'error': 'Invalid token format'}, status=status.HTTP_400_BAD_REQUEST)
 
             last_response = ""
-            if agent_id > 1:
-                prev_response = AgentResponse.objects.filter(
-                    token=token,
-                    agent_id=agent_id - 1
-                ).order_by('-created_at').first()
-
+            if agent_id == 1:
+                prev_response = AgentResponse.objects.filter(token=token, agent_id=agent_id).order_by('-created_at').first()
                 if prev_response:
                     last_response = prev_response.response
+            else:
+                current_agent_response = AgentResponse.objects.filter(token=token, agent_id=agent_id).order_by('-created_at').first()
+
+                if current_agent_response:
+                    last_response = current_agent_response.response
+                else:
+                    prev_agent_response = AgentResponse.objects.filter(token=token, agent_id=agent_id - 1).order_by('-created_at').first()
+                    if prev_agent_response:
+                        last_response = prev_agent_response.response
             # ============================================== Вызов агента ==============================================
             response_agent = 'error'
 
@@ -183,7 +187,7 @@ class ChatAPIView(APIView):
                 all_responses = AgentResponse.objects.filter(
                     token=token,
                     agent_id__in=[1, 2, 3, 4]
-                ).order_by('agent_id')
+                ).order_by('agent_id', '-created_at').distinct('agent_id')
 
                 structured_response = "Собранное техническое задание:\n\n"
 
@@ -199,20 +203,13 @@ class ChatAPIView(APIView):
 
                     structured_response += f"{section}{resp.response}\n\n"
 
-                AgentResponse.objects.create(
-                    token=token,
-                    agent_id=agent_id,
-                    response=structured_response
-                )
+                AgentResponse.objects.create(token=token, agent_id=agent_id, response=structured_response)
 
                 return Response({'token': token, 'text': structured_response}, status=status.HTTP_200_OK)
             # ============================================== Вызов агента ==============================================
 
-            AgentResponse.objects.create(
-                token=token,
-                agent_id=agent_id,
-                response=response_agent
-            )
+            if agent_id != 6:
+                AgentResponse.objects.create(token=token, agent_id=agent_id, response=response_agent)
 
             return Response({'token': token, 'text': response_agent}, status=status.HTTP_200_OK)
 
