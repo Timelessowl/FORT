@@ -97,7 +97,7 @@ const ThreadWelcome: FC<{ stageIndex: number }> = ({ stageIndex }) => {
         <div className="flex w-full flex-grow flex-col items-center justify-center">
           <p className="mt-4 font-medium">Фигово описали, разберемся потом :) </p>
         </div>
-        <ThreadWelcomeSuggestions />
+        { /*<ThreadWelcomeSuggestions />*/ }
       </div>
     </ThreadPrimitive.Empty>
   );
@@ -158,7 +158,8 @@ const Composer: FC<ComposerProps> = ({ isImageMode, handleToggle, stageIndex }) 
 const OptionsComposer: FC = () => {
   const thread = useThreadRuntime();
   const composer = thread.composer;
-  const options = ["Диаграммa", "Диаграмма2", "Схема"];
+  const options = ["DFD-диаграммa"];
+  // const options = ["Диаграммa", "Диаграмма2", "Схема"];
   const [checkedMap, setCheckedMap] = useState<Record<string, boolean>>(
     Object.fromEntries(options.map(o => [o, false]))
   );
