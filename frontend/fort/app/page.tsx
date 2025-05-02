@@ -17,7 +17,12 @@ export default function Home() {
 
   return (
     <MyRuntimeProvider>
-      <main className="h-dvh grid grid-cols-[200px_1fr] gap-x-2 px-4 py-4">
+      <main 
+      className="
+        h-dvh grid gap-x-2 px-4 py-4
+        grid-cols-1
+        md:grid-cols-[minmax(20%,35%)_1fr]
+      ">
         {/* <ThreadList />*/}
         <StageList 
           stageIndex={stageIndex}
