@@ -4,6 +4,7 @@ import {
   ComposerPrimitive,
   MessagePrimitive,
   ThreadPrimitive,
+  useThreadRuntime,
 } from "@assistant-ui/react";
 import type { FC } from "react";
 import { useState } from "react";
@@ -37,7 +38,7 @@ interface ComposerActionProps {
 }
 
 
-export const Thread: FC = () => {
+export const Thread: FC<{ stageIndex: number }> = ({ stageIndex }) => {
   const [isImageMode, setIsImageMode] = useState(false);
 
   const handleToggle = () => {
@@ -52,7 +53,7 @@ export const Thread: FC = () => {
       }}
     >
       <ThreadPrimitive.Viewport className="flex h-full flex-col items-center overflow-y-scroll scroll-smooth bg-inherit px-4 pt-8">
-        <ThreadWelcome />
+        <ThreadWelcome stageIndex={stageIndex} />
 
         <ThreadPrimitive.Messages
           components={{
@@ -68,7 +69,7 @@ export const Thread: FC = () => {
 
         <div className="sticky bottom-0 mt-3 flex w-full max-w-[var(--thread-max-width)] flex-col items-center justify-end rounded-t-lg bg-inherit pb-4">
           <ThreadScrollToBottom />
-          <Composer isImageMode={isImageMode} handleToggle={handleToggle}/>
+          <Composer isImageMode={isImageMode} handleToggle={handleToggle} stageIndex={stageIndex} />
         </div>
       </ThreadPrimitive.Viewport>
     </ThreadPrimitive.Root>
@@ -89,12 +90,12 @@ const ThreadScrollToBottom: FC = () => {
   );
 };
 
-const ThreadWelcome: FC = () => {
+const ThreadWelcome: FC<{ stageIndex: number }> = ({ stageIndex }) => {
   return (
     <ThreadPrimitive.Empty>
       <div className="flex w-full max-w-[var(--thread-max-width)] flex-grow flex-col">
         <div className="flex w-full flex-grow flex-col items-center justify-center">
-          <p className="mt-4 font-medium">Фигово описали, разберемся потом :)</p>
+          <p className="mt-4 font-medium">Фигово описали, разберемся потом :) </p>
         </div>
         <ThreadWelcomeSuggestions />
       </div>
@@ -132,9 +133,14 @@ const ThreadWelcomeSuggestions: FC = () => {
 interface ComposerProps {
   isImageMode: boolean;
   handleToggle: () => void;
+  stageIndex: number
 }
 
-const Composer: FC<ComposerProps> = ({ isImageMode, handleToggle }) => {
+const Composer: FC<ComposerProps> = ({ isImageMode, handleToggle, stageIndex }) => {
+    console.log("stageIndex", stageIndex)
+    if (stageIndex === 4) {  
+      return <OptionsComposer />;
+    }
   return (
     <ComposerPrimitive.Root className="focus-within:border-ring/20 flex w-full flex-wrap items-end rounded-lg border bg-inherit px-2.5 shadow-sm transition-colors ease-in">
       <ComposerPrimitive.Input
@@ -149,17 +155,47 @@ const Composer: FC<ComposerProps> = ({ isImageMode, handleToggle }) => {
   );
 };
 
+const OptionsComposer: FC = () => {
+  const thread = useThreadRuntime();
+  const composer = thread.composer;
+  const options = ["Диаграммa", "Диаграмма2", "Схема"];
+  const [checkedMap, setCheckedMap] = useState<Record<string, boolean>>(
+    Object.fromEntries(options.map(o => [o, false]))
+  );
+  const prompt = options.filter(o => checkedMap[o]).join(", ");
+  const toggle = (opt: string) => {
+    const next = { ...checkedMap, [opt]: !checkedMap[opt] };
+    const nextPrompt = options.filter((o) => next[o]).join(", ");
+
+    composer.setText(nextPrompt);
+    setCheckedMap(next);
+  };
+  return (
+      <ComposerPrimitive.Root className="flex w-full flex-col gap-3 rounded-lg border px-4 py-3 bg-inherit shadow-sm">
+      <ComposerPrimitive.Input className="hidden" />
+
+      <p className="font-medium">Выберите нужные схемы:</p>
+      <div className="flex flex-col gap-2">
+        {options.map(opt => (
+          <label key={opt} className="inline-flex items-center gap-2">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              checked={checkedMap[opt]}
+              onChange={() => toggle(opt)}
+            />
+            <span className="text-sm">{opt}</span>
+          </label>
+        ))}
+      </div>
+      <ComposerAction />
+    </ComposerPrimitive.Root>
+  );
+};
+
 const ComposerAction: FC<ComposerActionProps> = ({ isImageMode, handleToggle }) => {
   return (
     <>
-      <TooltipIconButton
-        tooltip={isImageMode ? "Generate Image" : "Answer as Text"}
-        variant={isImageMode ? "default" : "outline"}
-        className="my-2.5 size-8 p-2 transition-opacity ease-in mr-2"
-        onClick={handleToggle}
-      >
-        <ImageIcon />
-      </TooltipIconButton>
       <ThreadPrimitive.If running={false}>
         <ComposerPrimitive.Send asChild>
           <TooltipIconButton
@@ -336,3 +372,4 @@ const CircleStopIcon = () => {
     </svg>
   );
 };
+

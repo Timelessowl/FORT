@@ -6,29 +6,26 @@ import {
 } from "@assistant-ui/react";
 import { Button } from "@/components/ui/button";
 
-export const StageList: FC = () => {
+export const StageList: FC<{
+    stageIndex: number;
+    onChangeStage: (i: number) => void
+  }> = ({ stageIndex, onChangeStage }) => {
   const stages = [
-    { id: "stage-1", title: "Stage 1: Общее описание" },
-    { id: "stage-2", title: "Stage 2: Цели проекта" },
-    { id: "stage-3", title: "Stage 3: Пользовательские группы" },
-    { id: "stage-4", title: "Stage 4: Требования" },
-    { id: "stage-5", title: "Stage 5: Генерация схем" },
+    { id: "stage-1", title: "Этап 1: Общее описание" },
+    { id: "stage-2", title: "Этап 2: Цели проекта" },
+    { id: "stage-3", title: "Этап 3: Пользовательские группы" },
+    { id: "stage-4", title: "Этап 4: Требования" },
+    { id: "stage-5", title: "Этап 5: Генерация схем" },
     { id: "stage-6", title: "Результат" },
   ];
 
-  const [activeStage, setActiveStage] = useState(0);
 
   const handleNext = () => {
-    if (activeStage < stages.length - 1) {
-      setActiveStage((prev) => {
-        const newState = prev + 1
-        localStorage.setItem("agentId", String(newState))
-        localStorage.setItem("type", "text")
-
-        if (newState === 4)
-          localStorage.setItem("type", "mermaid")
-        return newState
-      });
+    if (stageIndex < stages.length - 1) {
+        const next = stageIndex + 1
+        onChangeStage(next)
+        localStorage.setItem("agentId", String(next))
+        localStorage.setItem("type", next === 4 ? "mermaid" : "text");
     }
   };
 
@@ -41,11 +38,11 @@ export const StageList: FC = () => {
   return (
     <ThreadListPrimitive.Root className="flex flex-col items-stretch gap-1.5">
       <StageNextButton
-        activeStage={activeStage}
+        activeStage={stageIndex}
         totalStages={stages.length}
         onNext={handleNext}
       />
-      <StageListItems stages={stages} activeStage={activeStage} />
+      <StageListItems stages={stages} activeStage={stageIndex} />
     </ThreadListPrimitive.Root>
   );
 };
@@ -117,10 +114,10 @@ const StageNextButton: FC<StageNextButtonProps> = ({
       <Button
         onClick={onNext}
         disabled={activeStage >= totalStages - 1}
-        className="data-[active]:bg-muted hover:bg-muted flex items-center justify-start gap-1 rounded-lg px-2.5 py-2 text-start"
-        variant="ghost"
+        // className="data-[active]:bg-muted hover:bg-muted flex items-center justify-start gap-1 rounded-lg px-2.5 py-2 text-start"
+        // variant="ghost"
       >
-        Next Stage
+       К следующему этапу 
       </Button>
     </ThreadListPrimitive.New>
   );

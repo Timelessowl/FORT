@@ -3,4 +3,5 @@ __pycache__/
 
 fort/node_modules/
 
+.env
 */.env
