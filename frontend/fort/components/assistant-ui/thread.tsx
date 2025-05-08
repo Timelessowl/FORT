@@ -161,8 +161,8 @@ const Composer: FC<ComposerProps> = ({ isImageMode, handleToggle, stageIndex }) 
 const OptionsComposer: FC = () => {
   const thread = useThreadRuntime();
   const composer = thread.composer;
-  const options = ["DFD-диаграммa"];
-  // const options = ["Диаграммa", "Диаграмма2", "Схема"];
+  // const options = ["DFD-диаграммa"];
+  const options = ["Диаграмма прецедентов", "Диаграмма Деятельности", "C4-модель", "ER-диаграмма", "DFD-диаграмма"];
   const [checkedMap, setCheckedMap] = useState<Record<string, boolean>>(
     Object.fromEntries(options.map(o => [o, false]))
   );
