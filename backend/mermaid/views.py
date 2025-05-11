@@ -11,6 +11,7 @@ from utils.mermaid_renderer import render_mermaid_to_png, MermaidRenderError
 from utils.dfd_generator import get_access_token, generate_mermaid_dfd_from_description
 from mermaid.serializer import MermaidRequestSerializer, ErrorResponseSerializer
 from utils.tz_critic_agent import TzPipeline, call_gigachat
+from utils.sanitize_mermaid_code import sanitize_mermaid_code
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +127,8 @@ class MermaidAPIView(APIView):
             mermaid_code = pipeline.generate_mermaid_diagram(structured_response, access_token)
             # ============================================== Вызов агента ==============================================
 
-            png_bytes: bytes = render_mermaid_to_png(mermaid_code)
+            clear_code: str = sanitize_mermaid_code(mermaid_code)
+            png_bytes: bytes = render_mermaid_to_png(clear_code)
 
             return HttpResponse(png_bytes, status=status.HTTP_200_OK, content_type='image/png')
 
