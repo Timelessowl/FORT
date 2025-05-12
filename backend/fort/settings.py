@@ -83,6 +83,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'chat.apps.ChatConfig',
     'mermaid.apps.MermaidConfig',
+    'confluence.apps.ConfluenceConfig',
     'rest_framework',
     'drf_spectacular',
     'corsheaders',

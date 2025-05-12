@@ -13,3 +13,4 @@ drf-spectacular==0.28.0
 django-cors-headers==4.7.0
 requests==2.31.0
 pillow
+atlassian-python-api==4.0.4
