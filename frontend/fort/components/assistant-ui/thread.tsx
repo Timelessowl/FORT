@@ -20,6 +20,7 @@ import {
   ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThreadBackgroundMessage } from "@/lib/messages";
 
 import { Button } from "@/components/ui/button";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
@@ -95,7 +96,9 @@ const ThreadWelcome: FC<{ stageIndex: number }> = ({ stageIndex }) => {
     <ThreadPrimitive.Empty>
       <div className="flex w-full max-w-[var(--thread-max-width)] flex-grow flex-col">
         <div className="flex w-full flex-grow flex-col items-center justify-center">
-          <p className="mt-4 font-medium">Фигово описали, разберемся потом :) </p>
+          {stageIndex === 4 ? 
+              <p className="mt-4 font-medium whitespace-pre-line">{ThreadBackgroundMessage}</p>
+              : <p className="mt-4 font-medium">Фигово описали, разберемся потом :) </p> } 
         </div>
         { /*<ThreadWelcomeSuggestions />*/ }
       </div>
@@ -158,8 +161,8 @@ const Composer: FC<ComposerProps> = ({ isImageMode, handleToggle, stageIndex }) 
 const OptionsComposer: FC = () => {
   const thread = useThreadRuntime();
   const composer = thread.composer;
-  const options = ["DFD-диаграммa"];
-  // const options = ["Диаграммa", "Диаграмма2", "Схема"];
+  // const options = ["DFD-диаграммa"];
+  const options = ["Диаграмма прецедентов", "Диаграмма Деятельности", "C4-модель", "ER-диаграмма", "DFD-диаграмма"];
   const [checkedMap, setCheckedMap] = useState<Record<string, boolean>>(
     Object.fromEntries(options.map(o => [o, false]))
   );
