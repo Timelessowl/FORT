@@ -21,7 +21,8 @@ export default function Home() {
       className="
         h-dvh grid gap-x-2 px-4 py-4
         grid-cols-1
-        md:grid-cols-[minmax(20%,35%)_1fr]
+        md:grid-cols-[minmax(max-content,18rem)_1fr]
+        2xl:grid-cols-[minmax(max-content,22rem)_1fr]
       ">
         {/* <ThreadList />*/}
         <StageList 
