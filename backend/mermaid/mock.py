@@ -1,4 +1,8 @@
 from django.http import HttpResponse
+import os
+from django.conf import settings
+from django.http import JsonResponse
+import base64
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample, OpenApiParameter
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -84,18 +88,36 @@ class MermaidMockAPIView(APIView):
                 return Response({'error': '[MOCK] Ошибка рендеринга Mermaid'}, status=status.HTTP_400_BAD_REQUEST)
 
             # Стандартный ответ с фиксированной диаграммой
-            mock_mermaid = """
-                graph TD
-                    A[Пользователь] -->|Загружает| B(Сервер)
-                    B --> C{Обработка}
-                    C -->|Успех| D[База данных]
-                    C -->|Ошибка| E[Логи]
-                """
+            # mock_mermaid = """
+            #     graph TD
+            #         A[Пользователь] -->|Загружает| B(Сервер)
+            #         B --> C{Обработка}
+            #         C -->|Успех| D[База данных]
+            #         C -->|Ошибка| E[Логи]
+            #     """
+            #
+            # png_bytes: bytes = render_mermaid_to_png(mock_mermaid)
+            #
+            # return HttpResponse(png_bytes, status=status.HTTP_200_OK, content_type='image/png')
+            payload = request.data
+            texts = payload.get("texts") or ([payload.get("text")] if payload.get("text") else [])
+            if not isinstance(texts, list):
+                return JsonResponse(
+                    {"error": "`texts` must be an array of strings"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-            png_bytes: bytes = render_mermaid_to_png(mock_mermaid)
+            images_b64: list[str] = []
+            file_path = os.path.join(settings.BASE_DIR, 'test.png')
+            with open(file_path, 'rb') as f:
+                data = f.read()
+            
+            for _ in texts:
+                images_b64.append(base64.b64encode(data).decode())
 
-            return HttpResponse(png_bytes, status=status.HTTP_200_OK, content_type='image/png')
 
+            return JsonResponse({"images": images_b64}, status=status.HTTP_200_OK)
+            # return HttpResponse(data, status=status.HTTP_200_OK, content_type='image/png')
         except SystemExit as se:
             logger.warning(f'Agent error: {se}')
             return Response({'error': 'Agent error'}, status=status.HTTP_400_BAD_REQUEST)
