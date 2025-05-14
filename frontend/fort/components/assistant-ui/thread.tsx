@@ -18,7 +18,9 @@ import {
   RefreshCwIcon,
   SendHorizontalIcon,
   ImageIcon,
+  GlobeIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ThreadBackgroundMessage } from "@/lib/messages";
 
@@ -29,13 +31,76 @@ import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button
 const DefaultImageComponent: FC<{ src: string; alt?: string }> = ({
   src,
   alt = "",
-}) => (
-  <img
-    src={src}
-    alt={alt}
-    className="max-w-[240px] h-auto rounded-lg shadow-md m-1"
-  />
-);
+}) => <img src={src} alt={alt} className="max-w-[240px] h-auto m-1 rounded-md shadow" />;
+
+const GenerateConfluence: FC = () => {
+  const [loading, setLoading]   = useState(false);
+  const [pageUrl, setPageUrl]   = useState<string | null>(null);
+  const [html, setHtml]         = useState<string | null>(null);
+
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
+
+  const createPage = async () => {
+    if (!token) return;
+    try {
+      setLoading(true);
+      const backend = process.env.NEXT_PUBLIC_BACKEND_URL ?? "";
+      const payload = {
+        token,
+        confluence_url:        process.env.NEXT_PUBLIC_CONFLUENCE_URL,
+        confluence_username:   process.env.NEXT_PUBLIC_CONFLUENCE_USER,
+        confluence_api_token:  process.env.NEXT_PUBLIC_CONFLUENCE_API_TOKEN,
+        confluence_space_key:  process.env.NEXT_PUBLIC_CONFLUENCE_SPACE,
+      };
+
+      const res  = await fetch(`${backend}/api/v1/create-confluence-tz/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error("Failed to create page");
+      const { page_url, html: rawHtml } = await res.json();
+
+      setPageUrl(page_url);
+      setHtml(rawHtml);
+      toast.success("Страница Confluence создана!");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="w-full max-w-[var(--thread-max-width)] flex flex-col items-center gap-4 py-6">
+      {!pageUrl && (
+        <Button onClick={createPage} disabled={loading}>
+          {loading ? "Создание…" : "Сгенерировать страницу Confluence"}
+        </Button>
+      )}
+
+      {pageUrl && (
+        <a
+          href={pageUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 shadow"
+        >
+          <GlobeIcon size={16} />
+          Открыть в Confluence
+        </a>
+      )}
+
+      {html && (
+        <div
+          className="prose max-h-96 w-full overflow-auto rounded-lg border p-4"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      )}
+    </div>
+  );
+};
 
 interface ComposerActionProps {
   isImageMode: boolean;
@@ -72,10 +137,22 @@ export const Thread: FC<{ stageIndex: number }> = ({ stageIndex }) => {
           <div className="min-h-8 flex-grow" />
         </ThreadPrimitive.If>
 
-        <div className="sticky bottom-0 mt-3 flex w-full max-w-[var(--thread-max-width)] flex-col items-center justify-end rounded-t-lg bg-inherit pb-4">
+        { /*<div className="sticky bottom-0 mt-3 flex w-full max-w-[var(--thread-max-width)] flex-col items-center justify-end rounded-t-lg bg-inherit pb-4">
           <ThreadScrollToBottom />
           <Composer isImageMode={isImageMode} handleToggle={handleToggle} stageIndex={stageIndex} />
-        </div>
+        </div> */}
+       {stageIndex < 5 && (
+          <div className="sticky bottom-0 mt-3 flex w-full max-w-[var(--thread-max-width)] flex-col items-center justify-end rounded-t-lg bg-inherit pb-4">
+            <ThreadScrollToBottom />
+            <Composer
+              isImageMode={isImageMode}
+              handleToggle={handleToggle}
+              stageIndex={stageIndex}
+            />
+          </div>
+        )}
+
+        {stageIndex === 5 && <GenerateConfluence />}
       </ThreadPrimitive.Viewport>
     </ThreadPrimitive.Root>
   );
