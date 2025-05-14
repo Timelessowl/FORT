@@ -27,6 +27,7 @@ const MyModelAdapter: ChatModelAdapter = {
 
     let apiEndpoint: string;
     const type = localStorage.getItem('type') || "";
+    const isMermaid = type === "mermaid";
     const agentId =  Number(localStorage.getItem('agentId') ?? 0) + 1;
 
     if (type === 'mermaid') {
@@ -39,10 +40,12 @@ const MyModelAdapter: ChatModelAdapter = {
 
     // const requestBody = { token, text: userText };
 
-    const requestBody = {
-      token,
-      texts,
-    };
+  const requestBody = isMermaid
+    ? { token, texts: rawText
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean) }
+    : { token, text: rawText };
 
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
 
