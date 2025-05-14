@@ -44,9 +44,9 @@ const MyModelAdapter: ChatModelAdapter = {
       texts,
     };
 
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
 
-    const response = await fetch(`${backendUrl}${apiEndpoint}/mock`, {
+    const response = await fetch(`${backendUrl}${apiEndpoint}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody),
