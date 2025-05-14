@@ -16,11 +16,14 @@ const MyModelAdapter: ChatModelAdapter = {
       throw new Error("Token is required for the Mermaid endpoint.");
     }
 
-    const lastMessage = messages[messages.length - 1];
-    const userText = lastMessage.content?.[0]?.text || "";
-    if (!userText) {
-      throw new Error("User message text is missing.");
-    }
+    const lastMessage = messages.at(-1);
+    const rawText = lastMessage?.content?.[0]?.text ?? "";
+    if (!rawText) throw new Error("User message text is missing.");
+
+    const texts = rawText
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
 
     let apiEndpoint: string;
     const type = localStorage.getItem('type') || "";
@@ -34,11 +37,16 @@ const MyModelAdapter: ChatModelAdapter = {
       throw new Error("Neither agentId nor mermaid type specified in localStorage");
     }
 
-    const requestBody = { token, text: userText };
+    // const requestBody = { token, text: userText };
 
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
+    const requestBody = {
+      token,
+      texts,
+    };
 
-    const response = await fetch(`${backendUrl}${apiEndpoint}`, {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+    const response = await fetch(`${backendUrl}${apiEndpoint}/mock`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody),
@@ -49,13 +57,13 @@ const MyModelAdapter: ChatModelAdapter = {
       const errorData = await response.json();
       throw new Error(errorData.error || "Unknown error occurred");
     }
-    if (type === 'mermaid') {
-      const blob = await response.blob();
-      const imageUrl = URL.createObjectURL(blob);
-      return {
-        content: [{ type: "image", src: imageUrl }],
-        token,
-      };
+    if (type === "mermaid") {
+      const { images } = await response.json();
+      const content = (images as string[]).map((b64) => ({
+        type: "image" as const,
+        src: `data:image/png;base64,${b64}`,
+      }));
+      return { content, token };
     } else {
       const data = await response.json();
       return {
