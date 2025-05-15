@@ -2,6 +2,7 @@ import requests
 import uuid
 import base64
 
+
 # === Получение токена доступа ===
 def get_access_token(client_id: str, client_secret: str) -> str:
     url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
@@ -22,6 +23,7 @@ def get_access_token(client_id: str, client_secret: str) -> str:
     response.raise_for_status()
     return response.json()["access_token"]
 
+
 # === Вызов GigaChat ===
 def call_gigachat(prompt: str, access_token: str) -> str:
     url = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
@@ -34,7 +36,7 @@ def call_gigachat(prompt: str, access_token: str) -> str:
     }
 
     payload = {
-        "model": "GigaChat-Pro",
+        "model": "GigaChat",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.5,
         "stream": False
@@ -43,6 +45,7 @@ def call_gigachat(prompt: str, access_token: str) -> str:
     response = requests.post(url, headers=headers, json=payload, verify=False)
     response.raise_for_status()
     return response.json()["choices"][0]["message"]["content"]
+
 
 # === Базовый класс агента ===
 class BaseAgent:
@@ -63,6 +66,7 @@ class BaseAgent:
         merged_input = previous.strip() + "\n\nКомментарий пользователя:\n" + user_comment.strip()
         prompt = self.build_prompt(merged_input)
         return self.call_model(prompt, llm_callable, token)
+
 
 # === Агент-критик ===
 class TzCriticAgent:
@@ -86,6 +90,7 @@ class TzCriticAgent:
         prompt = self.prompt_template.format(tz_block=block_text.strip())
         return llm_callable(prompt, token)
 
+
 # === Специализированные агенты ===
 class DescriptionAgent(BaseAgent):
     def __init__(self):
@@ -107,6 +112,7 @@ class DescriptionAgent(BaseAgent):
 """
         super().__init__("Описание проекта", prompt)
 
+
 class GoalsAgent(BaseAgent):
     def __init__(self):
         prompt = """
@@ -122,6 +128,7 @@ class GoalsAgent(BaseAgent):
 {previous_response_and_comment}
 """
         super().__init__("Цели проекта", prompt)
+
 
 class UsersAgent(BaseAgent):
     def __init__(self):
@@ -139,6 +146,7 @@ class UsersAgent(BaseAgent):
 {previous_response_and_comment}
 """
         super().__init__("Пользователи и роли", prompt)
+
 
 class RequirementsAgent(BaseAgent):
     def __init__(self):
@@ -160,6 +168,8 @@ class RequirementsAgent(BaseAgent):
 {previous_response_and_comment}
 """
         super().__init__("Требования", prompt)
+
+
 class MermaidDiagramAgent:
     def __init__(self):
         self.name = "Генератор диаграммы"
@@ -189,7 +199,7 @@ class MermaidDiagramAgent:
         }
 
         payload = {
-            "model": "GigaChat-Pro",
+            "model": "GigaChat",
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.7,
             "stream": False
@@ -201,7 +211,8 @@ class MermaidDiagramAgent:
             response.raise_for_status()
             return response.json()["choices"][0]["message"]["content"]
         except requests.exceptions.RequestException as e:
-            raise SystemExit(f"Ошибка при запросе к GigaChat API: {e}\nОтвет: {getattr(e.response, 'text', 'нет данных')}")
+            raise SystemExit(
+                f"Ошибка при запросе к GigaChat API: {e}\nОтвет: {getattr(e.response, 'text', 'нет данных')}")
 
 
 # === Контроллер пайплайна ===
@@ -257,8 +268,8 @@ class TzPipeline:
 
 # === CLI-запуск ===
 if __name__ == "__main__":
-    client_id = "fa6a2bfa-8d8b-4791-a4d2-9eff6818bca5"
-    client_secret = "3f77688a-c8f4-4b83-9da4-ac671c908d85"
+    client_id = ""
+    client_secret = ""
 
     # Получение токена
     token = get_access_token(client_id, client_secret)
