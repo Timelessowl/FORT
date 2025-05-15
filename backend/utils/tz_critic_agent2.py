@@ -458,33 +458,20 @@ class TzPipeline:
             "ER Diagram": ERDiagramAgent(),
         }
 
-    def run_agent(self, agent_key: str, user_comment: str, token: str) -> str:
+    def run_agent(self, agent_key: str, last_response: str, user_comment: str, token: str) -> str:
         agent = self.agents[agent_key]
 
         # Фаза уточнений
-        current_input = user_comment
-        while True:
-            resp = agent.clarify_or_generate(agent.last_response, current_input, self.llm, token)
-            if resp.endswith("?"):
-                current_input = input(f"\n❓ {resp}\n└─ Ваш ответ: ")
-                continue
-            raw_output = resp
-            break
+        resp = agent.clarify_or_generate(last_response, user_comment, self.llm, token)
+        if resp.endswith("?"):
+            return resp
 
         # Фаза критики
-        improved_output = self.critic.review(raw_output)
-        print(f"\n📄 Результат от агента «{agent.name}» после критики:\n{improved_output}\n")
-
-        # Цикл правок по замечаниям
-        while True:
-            remark = input("🛠 Есть замечания? (Enter — если нет): ").strip()
-            if not remark:
-                break
-            improved_output = self.critic.review(improved_output + "\n\nКомментарий:\n" + remark)
-            print(f"\n📄 Обновлённый текст после правок:\n{improved_output}\n")
+        improved_output = self.critic.review(resp)
 
         agent.last_response = improved_output
         return improved_output
+
 
     def get_all_responses(self) -> dict:
         return {key: agent.last_response for key, agent in self.agents.items()}
@@ -496,7 +483,7 @@ class TzPipeline:
         # full_text = self.get_full_text()
         outputs = {}
         for title, agent in self.diagram_agents.items():
-            if (title in diagram_types):
+            if title in diagram_types:
                 outputs[title] = agent.generate(full_text, token)
         return outputs
 
@@ -536,7 +523,7 @@ if __name__ == "__main__":
     )
 
     # Инициализация пайплайна
-    pipeline = TzPipeline(llm_callable=call_gigachat, embedding_model=local_embedding)
+    pipeline = TzPipeline(llm_callable=call_gigachat, embedding_model=local_embedding, llm=llm)
 
     # Работа с агентами
     print("📌 Шаг 1: Общее описание проекта")

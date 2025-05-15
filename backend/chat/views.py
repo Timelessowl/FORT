@@ -5,10 +5,14 @@ from rest_framework import status
 import logging
 import uuid
 import environ
+import base64
+import os
+from langchain_gigachat.chat_models import GigaChat
+from langchain_huggingface import HuggingFaceEmbeddings
 
 from chat.models import AgentResponse
 from chat.serializer import ChatResponseSerializer, ErrorResponseSerializer
-from utils.tz_critic_agent import get_access_token, TzPipeline, call_gigachat
+from utils.tz_critic_agent2 import get_access_token, TzPipeline, call_gigachat
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +21,31 @@ class ChatAPIView(APIView):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         env = environ.Env()
-        self.client_id = env('CLIENT_ID')
-        self.client_secret = env('CLIENT_SECRET')
-        self.access_token = get_access_token(self.client_id, self.client_secret)
+        client_id = env('CLIENT_ID')
+        client_secret = env('CLIENT_SECRET')
+
+        self.access_token: str = get_access_token(client_id, client_secret)
+        basic_creds = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+
+        # 2) (Опционально) Через переменную окружения
+        os.environ["GIGACHAT_CREDENTIALS"] = basic_creds
+        # 3) Инициализируем LLM и эмбеддинги
+        self.llm = GigaChat(
+            # либо просто GigaChat(), если задали GIGACHAT_CREDENTIALS
+            credentials=basic_creds,
+            auth_url="https://ngw.devices.sberbank.ru:9443/api/v2/oauth",
+            base_url="https://gigachat.devices.sberbank.ru/api/v1",
+            scope="GIGACHAT_API_PERS",
+            verify_ssl_certs=False,
+        )
+        model_name = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+        model_kwargs = {"device": "cpu"}
+        encode_kwargs = {"normalize_embeddings": False}
+        self.local_embedding = HuggingFaceEmbeddings(
+            model_name=model_name,
+            model_kwargs=model_kwargs,
+            encode_kwargs=encode_kwargs
+        )
 
     @extend_schema(
         summary='Генерация ТЗ через чат с ИИ агентом',
@@ -168,7 +194,7 @@ class ChatAPIView(APIView):
             # ============================================== Вызов агента ==============================================
             response_agent = 'error'
 
-            pipeline = TzPipeline(llm_callable=call_gigachat)
+            pipeline = TzPipeline(llm_callable=call_gigachat, embedding_model=self.local_embedding, llm=self.llm)
 
             if agent_id == 1:
                 # Агент 1: Общее описание
@@ -209,7 +235,10 @@ class ChatAPIView(APIView):
             # ============================================== Вызов агента ==============================================
 
             if agent_id != 6:
-                AgentResponse.objects.create(token=token, agent_id=agent_id, response=response_agent)
+                if response_agent.endswith("?"):
+                    pass
+                else:
+                    AgentResponse.objects.create(token=token, agent_id=agent_id, response=response_agent)
 
             return Response({'token': token, 'text': response_agent}, status=status.HTTP_200_OK)
 
