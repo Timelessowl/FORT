@@ -6,6 +6,7 @@ from atlassian import Confluence
 import logging
 import requests
 import re
+from django.conf import settings
 
 from chat.models import AgentResponse
 
@@ -13,12 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 class ConfluenceApiView(APIView):
-
-    def __init__(self):
-        self.CONFLUENCE_URL = ""
-        self.CONFLUENCE_USERNAME = ""
-        self.CONFLUENCE_API_TOKEN = ""
-        self.CONFLUENCE_SPACE_KEY = ""
 
     @extend_schema(
         summary='Создание страницы ТЗ в Confluence',
@@ -163,26 +158,13 @@ class ConfluenceApiView(APIView):
     )
     def post(self, request):
         try:
-            self.CONFLUENCE_URL = request.data.get('confluence_url')
-            self.CONFLUENCE_USERNAME = request.data.get('confluence_username')
-            self.CONFLUENCE_API_TOKEN = request.data.get('confluence_api_token')
-            self.CONFLUENCE_SPACE_KEY = request.data.get('confluence_space_key')
             token = request.data.get('token')
-
-            if not all([self.CONFLUENCE_URL, self.CONFLUENCE_USERNAME, self.CONFLUENCE_API_TOKEN,
-                        self.CONFLUENCE_SPACE_KEY, token]):
-                missing_fields = [
-                    field for field, value in {
-                        'confluence_url': self.CONFLUENCE_URL,
-                        'confluence_username': self.CONFLUENCE_USERNAME,
-                        'confluence_api_token': self.CONFLUENCE_API_TOKEN,
-                        'confluence_space_key': self.CONFLUENCE_SPACE_KEY,
-                        'token': token
-                    }.items() if not value
-                ]
-                return Response({'error': f'Missing required fields: {", ".join(missing_fields)}'},
-                                status=status.HTTP_400_BAD_REQUEST)
-
+            if not token:
+                return Response({'error': 'Missing required field: token'}, status=status.HTTP_400_BAD_REQUEST)
+            self.CONFLUENCE_URL        = settings.CONFLUENCE_URL
+            self.CONFLUENCE_USERNAME   = settings.CONFLUENCE_USERNAME
+            self.CONFLUENCE_API_TOKEN  = settings.CONFLUENCE_API_TOKEN
+            self.CONFLUENCE_SPACE_KEY  = settings.CONFLUENCE_SPACE_KEY
             confluence = self.get_confluence_client()
             if not confluence:
                 return Response({'error': 'Confluence access configuration error'},
@@ -223,7 +205,7 @@ class ConfluenceApiView(APIView):
         """Создает и возвращает клиент Confluence с проверкой подключения"""
         try:
             confluence = Confluence(url=self.CONFLUENCE_URL, username=self.CONFLUENCE_USERNAME,
-                                    password=self.CONFLUENCE_API_TOKEN, cloud=False)
+                                    password=self.CONFLUENCE_API_TOKEN, cloud=True)
 
             confluence.get_space(self.CONFLUENCE_SPACE_KEY)
             return confluence
