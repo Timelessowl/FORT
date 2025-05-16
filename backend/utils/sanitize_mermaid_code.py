@@ -2,64 +2,307 @@ import re
 
 
 def sanitize_mermaid_code(mermaid_code: str) -> str:
-    code = re.sub(r'^\s*```mermaid\s*|\s*```\s*$', '', mermaid_code.strip(), flags=re.IGNORECASE)
+    # keywords = [
+    #     "graph TD", "graph LR", "graph RL", "graph BT",
+    #     "sequenceDiagram", "classDiagram", "stateDiagram",
+    #     "erDiagram", "gantt", "journey", "pie"
+    # ]
+    #
+    # # Удалим скрипты, html и markdown
+    # text = re.sub(r"<script.*?>.*?</script>", "", mermaid_code, flags=re.DOTALL)
+    # text = re.sub(r"<[^>]+>", "", text)
+    # text = re.sub(r"```mermaid", "", text)
+    # text = re.sub(r"```", "", text)
+    #
+    # # Удалим комментарии `//`
+    # text = re.sub(r"^\s*//.*$", "", text, flags=re.MULTILINE)
+    #
+    # # Ищем блок, начинающийся с одного из ключевых слов
+    # for keyword in keywords:
+    #     pattern = rf"({re.escape(keyword)}\b[\s\S]*?)($|\n\S)"
+    #     match = re.search(pattern, text)
+    #     if not match:
+    #         continue
+    #
+    #     block = match.group(1).strip()
+    #
+    #     # Чистим строки по отдельности
+    #     lines = block.splitlines()
+    #     clean_lines = []
+    #     started = False
+    #     for line in lines:
+    #         line = line.strip()
+    #         if not line:
+    #             continue
+    #
+    #         if not started and keyword not in line:
+    #             continue
+    #         started = True
+    #
+    #         # Удалим кавычки, заменим на безопасные экранированные или уберём
+    #         line = line.replace('"', '')
+    #
+    #         # Пропускаем строку, если в ней обычный текст или она похожа на описание
+    #         if not re.search(r"[->\[\](){}|]", line) and not line.startswith("graph"):
+    #             break  # всё, дальше невалидный блок, обрубаем
+    #
+    #         # Явно невалидные конструкции
+    #         if re.search(r"\)\|", line) or re.search(r"\|\w+\[", line):
+    #             break
+    #
+    #         clean_lines.append(line)
+    #
+    #     if clean_lines:
+    #         return "\n".join(clean_lines)
+    #
+    # return ""
+    def clean_block(block: str) -> str:
+        # Удаляем HTML и JS
+        block = re.sub(r"<script.*?>.*?</script>", "", block, flags=re.DOTALL)
+        block = re.sub(r"<[^>]+>", "", block)
 
-    valid_lines = []
-    mermaid_keywords = {
-        "graph", "subgraph", "end",
-        "sequenceDiagram", "gantt", "pie",
-        "classDiagram", "stateDiagram", "gitGraph",
-        "journey", "erDiagram", "requirementDiagram",
-        "direction", "%%", "-->", "->", "==>", "-.->",
-        "style", "click", "link", "classDef", "applyClass"
-    }
+        # Удаляем однострочные комментарии // ...
+        block = re.sub(r"^\s*//.*$", "", block, flags=re.MULTILINE)
 
-    for line in code.split('\n'):
-        stripped_line = line.strip()
-        if not stripped_line:
-            continue
+        # Удаляем кавычки внутри стрелок и по краям
+        block = block.replace('"', '')
 
-        is_valid = any(
-            stripped_line.startswith(keyword) or
-            f" {keyword}" in stripped_line or
-            f"\t{keyword}" in stripped_line
-            for keyword in mermaid_keywords
-        )
+        # Очищаем пустые и явно невалидные строки
+        lines = []
+        for line in block.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            # Пропускаем строки, не содержащие хотя бы один признак синтаксиса
+            if not re.search(r"(-->|\-\-|\[\[|\]\]|\(\)|\(|\)|{|\}|:)", line) and not re.match(
+                    r'^\s*(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|journey|pie)\b',
+                    line):
+                continue
+            lines.append(line)
 
-        if is_valid:
-            clean_line = line.replace('"', '')
-            valid_lines.append(clean_line)
-        else:
-            if valid_lines:
-                break
+        return '\n'.join(lines)
 
-    return '\n'.join(valid_lines).strip()
+    # Ищем все ```mermaid блоки
+    mermaid_blocks = re.findall(r"```mermaid\s*(.*?)\s*```", mermaid_code, flags=re.DOTALL)
+    if not mermaid_blocks:
+        # Вдруг это просто текст с `graph TD` и без markdown — тогда ищем по ключевым словам
+        keywords = [
+            "graph TD", "graph LR", "graph RL", "graph BT",
+            "flowchart TB", "flowchart TD", "sequenceDiagram",
+            "classDiagram", "stateDiagram", "erDiagram",
+            "gantt", "journey", "pie"
+        ]
+        for keyword in keywords:
+            pattern = rf"({re.escape(keyword)}[\s\S]+?)(?=\n\S|\Z)"
+            match = re.search(pattern, mermaid_code)
+            if match:
+                return clean_block(match.group(1))
+
+        return ""
+
+    # Берём первый валидный блок
+    for raw_block in mermaid_blocks:
+        cleaned = clean_block(raw_block)
+        if cleaned.strip():
+            return cleaned
+
+    return ""
 
 
 if __name__ == "__main__":
     invalid_mermaid = """
-        graph TD
-            Process((Принятие заявки)) -->|Присвоение статуса "В работе"| DB[[ERP]]
-            <script>alert('XSS')</script>
+ ```mermaid
+graph TD
+    Client[Client] --> |Create Repair Request| ServiceEngineer((Service Engineer))
+    ServiceEngineer --> |Assign Task| Technician((Technician))
+    Technician --> |Perform Repair| Equipment[Equipment]
+    Equipment --> |Update Status| Database[[Database]]
+    Database --> |Generate Report| DepartmentManager(Department Manager)
+    DepartmentManager --> |Approve Expenses| FinanceDepartment(Finance Department)
+    FinanceDepartment --> |Analyze Costs| ITSupportTeam(IT Support Team)
+    ITSupportTeam --> |Monitor System| SystemAdministrator(System Administrator)
+    SystemAdministrator --> |Manage Access Rights| Client
+```
         """
 
     clean_mermaid = sanitize_mermaid_code(invalid_mermaid)
     print(clean_mermaid)
 
-    invalid_mermaid = """
-     graph TD
+    invalid_mermaid = """Конечно! Вот пример того, как можно создать диаграмму активности в формате Mermaid.js для вашего технического задания: 
 
-    User[User] -->|Заявки на ремонт| Process(Обработка заявок)
-    Process(Обработка заявок) -->|Статус заявки| DB[[База данных]]
-    DB[[База данных]] -->|Отчеты| Process(Аналитика)
-    Process(Аналитика) -->|Эффективность| User[Руководитель]
-    
-    Администратор системы имеет доступ к следующим элементам:
-    
-    Process(Настройка прав доступа) -->|Роли пользователей| User[Администратор]
-    Process(Мониторинг активности)|User[Администратор]
-    Process(Управление учетными записями)|User[Администратор]
-    Process(Интеграция с другими системами)|User[Администратор]
+mermaid
+flowchart TB
+    start([Начало])
+    task1["Обработка запроса пользователя"]
+    decision{"Запрос корректен?"}
+    task2["Проверка данных"]
+    task3["Сохранение в базу данных"]
+    task4["Отправка уведомления"]
+    fork1{Параллельная обработка}
+    join1{Объединение потоков}
+    task5["Формирование отчета"]
+    end1([Конец])
+
+    start --> task1
+    task1 --> decision
+    decision -- Да --> task2
+    decision -- Нет --> task3
+    task2 --> fork1
+    fork1 --> task4 & task5
+    task4 --> join1
+    task5 --> join1
+    join1 --> end1
+
+
+Этот код создает диаграмму активности, которая включает в себя обработку запроса пользователя, проверку его корректности, сохранение данных в базе, отправку уведомления и формирование отчета. Параллельное выполнение задач показано через использование операторов fork и join."""
+
+    clean_mermaid = sanitize_mermaid_code(invalid_mermaid)
+    print(clean_mermaid)
+
+    invalid_mermaid = """
+      ```mermaid
+        graph TD
+        
+        // Внешние сущности
+        User[User]
+        Client[Client]
+        
+        // Процессы
+        Process(Создание заявки на ремонт)
+        Process(Отслеживание статуса заявки)
+        Process(Выполнение ремонтных работ)
+        Process(Закрытие заявки)
+        Process(Аналитика и отчетность)
+        
+        // Хранилища данных
+        DB[[База данных]]
+        
+        // Потоки данных
+        User -->|Заявка на ремонт| Client
+        Client -->|Статус заявки| Process
+        Client -->|Информация о ремонте| Process
+        Client -->|Уведомление об окончании ремонта| Process
+        Client -->|Отчеты| Process
+        
+        // Стрелки
+        A -->|Данные| B
+        ```
+    """
+
+    clean_mermaid = sanitize_mermaid_code(invalid_mermaid)
+    print(clean_mermaid)
+
+    invalid_mermaid = """
+         ```mermaid
+            usecaseDiagram
+                actor Customer as C
+                Customer — (Login)
+                (Login) --›|(includes authentication)| (Authenticate)
+                rectangle MySystem { (Login) (Purchase) }
+        ```
+    """
+
+    clean_mermaid = sanitize_mermaid_code(invalid_mermaid)
+    print(clean_mermaid)
+
+    clean_mermaid = sanitize_mermaid_code(invalid_mermaid)
+    print(clean_mermaid)
+
+    invalid_mermaid = """
+         Конечно! Вот пример реализации твоего запроса:
+        
+        ```mermaid
+        flowchart TB
+          start[Начало]
+        
+          task1["Получить запрос от пользователя"]
+          decision{"Проверить валидность данных?"}
+        
+          task2["Обработать запрос"]
+          task3["Отправить ответ пользователю"]
+        
+          join[Завершение]
+        
+          start --> task1 --> decision
+          decision -- Валидно --> task2 --> task3 --> join
+          decision -- Невалидно --> task1 --> end
+        
+          end[Конец]
+        ```
+        
+        Этот код создаст диаграмму деятельности в стиле BPMN с начальной и конечной точками, а также с действиями для обработки запроса.
+    """
+
+    clean_mermaid = sanitize_mermaid_code(invalid_mermaid)
+    print(clean_mermaid)
+
+    invalid_mermaid = """
+         Для того чтобы создать C4-модель в формате Mermaid.js на основе предоставленного тобой текста технического задания, нужно выделить основные элементы модели и их взаимосвязи. Вот как это может выглядеть:
+        
+        ```mermaid
+        C4Context
+          Person(customer, "Customer")
+          System_Boundary(OnlineStore, "Online Store") {
+            System(webApp, "Web Application")
+          }
+          System_Ext(paymentSvc, "Payment Gateway")
+        
+          Rel(customer, webApp, "Places orders via web UI")
+          Rel(webApp, paymentSvc, "Requests payment", "REST/JSON")
+        ```
+        
+        Этот код создаёт основную систему `OnlineStore`, включает в неё подсистему `webApp` и указывает на внешнюю систему `paymentSvc`. Также он показывает связь между `customer` (внешний участник) и `webApp` через размещение заказов (`Places orders via web UI`). Кроме того, указывается взаимодействие между `webApp` и `paymentSvc` для запроса оплаты через REST/JSON протокол.
+    """
+
+    clean_mermaid = sanitize_mermaid_code(invalid_mermaid)
+    print(clean_mermaid)
+
+    invalid_mermaid = """
+        Для того чтобы сгенерировать ER-диаграмму в формате Mermaid.js, необходимо следовать следующим шагам:
+        
+        1. **Выделение сущностей и атрибутов**:
+           - **Customer**:
+             - `PK id INT`
+             - `name VARCHAR`
+             - `email VARCHAR`
+           - **Order**:
+             - `PK id INT`
+             - `FK customerId INT`
+             - `orderDate DATE`
+        
+        2. **Определение связей с кардинальностями**:
+           - Связь между `Customer` и `Order`: `Customer ||--o{ Order : "places"` (где `places` означает, что один клиент может разместить много заказов).
+        
+        Вот как это будет выглядеть в виде кода для Mermaid.js:
+        
+        ```mermaid
+        erDiagram
+          Customer {
+            PK id INT,
+            name VARCHAR,
+            email VARCHAR
+          }
+          Order {
+            PK id INT,
+            FK customerId INT,
+            orderDate DATE
+          }
+          Customer ||--o{ Order : "places"
+        ```
+        
+        Этот код создаст следующую ER-диаграмму:
+        
+        ```mermaid
+        Customer
+          * PK id INT
+          * name VARCHAR
+          * email VARCHAR
+        Order
+          * PK id INT
+          * FK customerId INT
+          * orderDate DATE
+        Customer --o{ Order : "places"
+        ```
     """
 
     clean_mermaid = sanitize_mermaid_code(invalid_mermaid)
