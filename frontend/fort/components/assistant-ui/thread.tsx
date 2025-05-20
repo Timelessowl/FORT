@@ -59,7 +59,7 @@ const GenerateConfluence: FC = () => {
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error("Failed to create page");
+      if (!res.ok) throw new Error("Не удалось создать страницу");
       const { page_url, html: rawHtml } = await res.json();
 
       setPageUrl(page_url);
@@ -242,15 +242,20 @@ const Composer: FC<ComposerProps> = ({ isImageMode, handleToggle, stageIndex }) 
 const OptionsComposer: FC = () => {
   const thread = useThreadRuntime();
   const composer = thread.composer;
-  // const options = ["DFD-диаграммa"];
-  const options = ["Диаграмма прецедентов", "Диаграмма Деятельности", "C4-модель", "ER-диаграмма", "DFD-диаграмма"];
+  const options = [
+      { label: "Диаграмма прецедентов", key: "Use Case" },
+      { label: "Диаграмма Деятельности", key: "Activity" },
+      { label: "C4-модель",             key: "C4 Context" },
+      { label: "ER-диаграмма",          key: "ER Diagram" },
+      { label: "DFD-диаграмма",         key: "DFD" },
+    ];
   const [checkedMap, setCheckedMap] = useState<Record<string, boolean>>(
-    Object.fromEntries(options.map(o => [o, false]))
+    Object.fromEntries(options.map(o => [o.key, false]))
   );
-  const prompt = options.filter(o => checkedMap[o]).join(", ");
+  const prompt = options.filter(o => checkedMap[o.key]).map(o => o.key).join(", ");
   const toggle = (opt: string) => {
     const next = { ...checkedMap, [opt]: !checkedMap[opt] };
-    const nextPrompt = options.filter((o) => next[o]).join(", ");
+    const nextPrompt = options.filter((o) => next[o.key]).map(o => o.key).join(", ");
 
     composer.setText(nextPrompt);
     setCheckedMap(next);
@@ -261,17 +266,17 @@ const OptionsComposer: FC = () => {
 
       <p className="font-medium">Выберите нужные схемы:</p>
       <div className="flex flex-col gap-2">
-        {options.map(opt => (
-          <label key={opt} className="inline-flex items-center gap-2">
+       {options.map(({ label, key }) => (
+          <label key={key} className="inline-flex items-center gap-2">
             <input
               type="checkbox"
               className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-              checked={checkedMap[opt]}
-              onChange={() => toggle(opt)}
+              checked={checkedMap[key]}
+              onChange={() => toggle(key)}
             />
-            <span className="text-sm">{opt}</span>
+            <span className="text-sm">{label}</span>
           </label>
-        ))}
+            ))}      
       </div>
       <ComposerAction />
     </ComposerPrimitive.Root>
