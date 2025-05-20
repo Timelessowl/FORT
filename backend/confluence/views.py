@@ -178,10 +178,10 @@ class ConfluenceApiView(APIView):
                                                                                                           '-created_at').distinct(
                 'agent_id')
 
-            if not all_responses.exists():
-                return Response({'error': 'No technical specification found for this token'},
-                                status=status.HTTP_404_NOT_FOUND)
-
+            # if not all_responses.exists():
+            #     return Response({'error': 'No technical specification found for this token'},
+            #                     status=status.HTTP_404_NOT_FOUND)
+            #
             page_title = f"Техническое задание [token: {token}]"
             html_content = self.generate_confluence_html(all_responses)
 
