@@ -189,8 +189,14 @@ class ConfluenceApiView(APIView):
                 result = self.create_or_update_page(confluence, page_title, html_content)
 
                 page_url = f"{self.CONFLUENCE_URL}{result['_links']['webui']}"
+                page_id = result['id']
+                rendered = confluence.get_page_by_id(
+                    page_id,
+                    expand="body.view"
+                )
+                html_view = rendered["body"]["view"]["value"]
 
-                return Response({'page_url': page_url, 'page_id': result['id']}, status=status.HTTP_200_OK)
+                return Response({'page_url': page_url, 'page_id': page_id, 'html': html_view}, status=status.HTTP_200_OK)
 
             except requests.exceptions.HTTPError as http_err:
                 logger.error(f"Confluence API error: {http_err}")
