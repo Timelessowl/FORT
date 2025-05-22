@@ -17,6 +17,7 @@ from utils.mermaid_renderer import render_mermaid_to_png, MermaidRenderError
 from utils.dfd_generator import get_access_token, generate_mermaid_dfd_from_description
 from mermaid.serializer import MermaidRequestSerializer, ErrorResponseSerializer
 from utils.tz_critic_agent2 import TzPipeline, call_gigachat
+from utils.sanitize_mermaid_code_2 import sanitize_mermaid_code_2
 from utils.sanitize_mermaid_code import sanitize_mermaid_code
 
 logger = logging.getLogger(__name__)
@@ -172,19 +173,26 @@ class MermaidAPIView(APIView):
             all_diags = pipeline.generate_all_diagrams(structured_response, self.access_token, texts)
             images_b64: list[str] = []
             for title, code in all_diags.items():
-                print(title, "\n\n\n", code)
+                # print(title, "\n\n\n", code)
                 try:
                     png_bytes: bytes = render_mermaid_to_png(code)
                     images_b64.append(base64.b64encode(png_bytes).decode())
                 except Exception as e:
                     try:
-                        clear_code: str = sanitize_mermaid_code(code)
-                        print("clear_code \n\n", clear_code)
+                        clear_code: str = sanitize_mermaid_code_2(code)
+                        # print("clear_code_2 \n\n", clear_code)
                         if clear_code:
                             png_bytes: bytes = render_mermaid_to_png(clear_code)
                             images_b64.append(base64.b64encode(png_bytes).decode())
                     except Exception as e:
-                        logger.exception(f'Error render_mermaid_to_png: {e}')
+                        try:
+                            clear_code: str = sanitize_mermaid_code(code)
+                            # print("clear_code_1 \n\n", clear_code)
+                            if clear_code:
+                                png_bytes: bytes = render_mermaid_to_png(clear_code)
+                                images_b64.append(base64.b64encode(png_bytes).decode())
+                        except Exception as e:
+                            logger.exception(f'Error render_mermaid_to_png: {e}')
 
             # return Response(png_bytes_array, status=status.HTTP_200_OK, content_type='application/json')
             return JsonResponse({"images": images_b64}, status=status.HTTP_200_OK)

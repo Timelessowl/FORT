@@ -286,15 +286,18 @@ class UseCaseDiagramAgent:
                 2. Определить ключевые прецеденты (use cases): что делает каждый актор.
                 3. Показывать связи:
                    - ассоциации (Actor — UseCase),
-                   - «include» (UseCase --›|<<include>>| OtherUseCase),
-                   - «extend» (UseCase --›|<<extend>>| OtherUseCase).
+                   - «include» (UseCase -->|<<include>>| OtherUseCase),
+                   - «extend» (UseCase -->|<<extend>>| OtherUseCase).
                 4. Группировать прецеденты в границы системы (с помощью `rectangle System { ... }`).
                 5. Использовать синтаксис Mermaid:
-                    usecaseDiagram
-                      actor Customer as C
-                      Customer — (Login)
-                      (Login) --›|(includes authentication)| (Authenticate)
-                      rectangle MySystem { (Login) (Purchase) }
+                      %%{ init: {'theme': 'default'} }%%
+                        graph TD
+                          C[Customer] --> Login
+                          Login --> Authenticate
+                          subgraph MySystem
+                            Login
+                            Purchase
+                          end
                 Верни только mermaid-код без пояснений.
                 '''
 
@@ -331,20 +334,20 @@ class ActivityDiagramAgent:
             2. Выделить ключевые действия и соединить их стрелками (`-->`).
             3. Моделировать точки принятия решений (`decision`) с исходами (`-->|label|`).
             4. Отметить параллельные потоки (`fork` / `join`).
-            5. Обозначить конечную ноду (`end`).
+            5. Обозначить конечную ноду (`endNode`).
             6. Показать циклические ветки при необходимости.
             Пример:
                 flowchart TB
-                  start([Start])
-                  task1["Получить запрос от пользователя"]
-                  decision{"Валидны ли данные?"}
-                  task2["Сохранить в БД"]
-                  task3["Вернуть ошибку"]
-                  end([End])
-                
-                  start --> task1 --> decision
-                  decision -- Yes --> task2 --> end
-                  decision -- No --> task3 --> end
+                    start([Start])
+                    task1["Получить запрос от пользователя"]
+                    decision{"Валидны ли данные?"}
+                    task2["Сохранить в БД"]
+                    task3["Вернуть ошибку"]
+                    endNode([End])
+                    
+                    start --> task1 --> decision
+                    decision -- Yes --> task2 --> endNode
+                    decision -- No --> task3 --> endNode
             Верни только mermaid-фрагмент.
             '''
 
@@ -405,21 +408,21 @@ class ERDiagramAgent:
                 На входе — текстовые блоки ТЗ.
                 Твоя задача:
                 1. Выделить сущности и атрибуты.
-                2. Указать PK/ FK: Table { PK id INT }.
+                2. Указать PK/ FK: Table { id INT PK }.
                 3. Определить связи с кардинальностями: Entity1 ||--o{ Entity2 : "has many".
                 Пример:
-                    erDiagram
-                      Customer {
-                        PK id INT
-                        name VARCHAR
-                        email VARCHAR
-                      }
-                      Order {
-                        PK id INT
-                        FK customerId INT
-                        orderDate DATE
-                      }
-                      Customer ||--o{ Order : "places"
+                      erDiagram
+                        Customer {
+                            id INT PK
+                            name VARCHAR
+                            email VARCHAR
+                        }
+                        Order {
+                            id INT PK
+                            customerId INT FK
+                            orderDate DATE
+                        }
+                        Customer ||--o{ Order : "places"
                     Верни только mermaid-описание.
                     '''
 

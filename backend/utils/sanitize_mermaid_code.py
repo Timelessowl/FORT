@@ -2,60 +2,6 @@ import re
 
 
 def sanitize_mermaid_code(mermaid_code: str) -> str:
-    # keywords = [
-    #     "graph TD", "graph LR", "graph RL", "graph BT",
-    #     "sequenceDiagram", "classDiagram", "stateDiagram",
-    #     "erDiagram", "gantt", "journey", "pie"
-    # ]
-    #
-    # # Удалим скрипты, html и markdown
-    # text = re.sub(r"<script.*?>.*?</script>", "", mermaid_code, flags=re.DOTALL)
-    # text = re.sub(r"<[^>]+>", "", text)
-    # text = re.sub(r"```mermaid", "", text)
-    # text = re.sub(r"```", "", text)
-    #
-    # # Удалим комментарии `//`
-    # text = re.sub(r"^\s*//.*$", "", text, flags=re.MULTILINE)
-    #
-    # # Ищем блок, начинающийся с одного из ключевых слов
-    # for keyword in keywords:
-    #     pattern = rf"({re.escape(keyword)}\b[\s\S]*?)($|\n\S)"
-    #     match = re.search(pattern, text)
-    #     if not match:
-    #         continue
-    #
-    #     block = match.group(1).strip()
-    #
-    #     # Чистим строки по отдельности
-    #     lines = block.splitlines()
-    #     clean_lines = []
-    #     started = False
-    #     for line in lines:
-    #         line = line.strip()
-    #         if not line:
-    #             continue
-    #
-    #         if not started and keyword not in line:
-    #             continue
-    #         started = True
-    #
-    #         # Удалим кавычки, заменим на безопасные экранированные или уберём
-    #         line = line.replace('"', '')
-    #
-    #         # Пропускаем строку, если в ней обычный текст или она похожа на описание
-    #         if not re.search(r"[->\[\](){}|]", line) and not line.startswith("graph"):
-    #             break  # всё, дальше невалидный блок, обрубаем
-    #
-    #         # Явно невалидные конструкции
-    #         if re.search(r"\)\|", line) or re.search(r"\|\w+\[", line):
-    #             break
-    #
-    #         clean_lines.append(line)
-    #
-    #     if clean_lines:
-    #         return "\n".join(clean_lines)
-    #
-    # return ""
     def clean_block(block: str) -> str:
         # Удаляем HTML и JS
         block = re.sub(r"<script.*?>.*?</script>", "", block, flags=re.DOTALL)
