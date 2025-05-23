@@ -1,24 +1,23 @@
-from django.http import HttpResponse
+from django.http import JsonResponse
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_gigachat.chat_models import GigaChat
 import logging
 import environ
-import json
-from django.http import JsonResponse
 import base64
 import os
-from langchain_gigachat.chat_models import GigaChat
-from langchain_huggingface import HuggingFaceEmbeddings
 
+from mermaid.models import MermaidImage
 from chat.models import AgentResponse
-from utils.mermaid_renderer import render_mermaid_to_png, MermaidRenderError
 from utils.dfd_generator import get_access_token, generate_mermaid_dfd_from_description
+from utils.mermaid_renderer import render_mermaid_to_png, MermaidRenderError
 from mermaid.serializer import MermaidRequestSerializer, ErrorResponseSerializer
-from utils.tz_critic_agent2 import TzPipeline, call_gigachat
 from utils.sanitize_mermaid_code_2 import sanitize_mermaid_code_2
 from utils.sanitize_mermaid_code import sanitize_mermaid_code
+from utils.tz_critic_agent2 import TzPipeline, call_gigachat
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +51,19 @@ class MermaidAPIView(APIView):
             model_kwargs=model_kwargs,
             encode_kwargs=encode_kwargs
         )
+
+    def _render_diagram(self, title: str, code: str) -> tuple[str | None, bool]:
+        """Attempt to render a diagram with retries on sanitized code."""
+        for render_func in [lambda c: c, sanitize_mermaid_code_2, sanitize_mermaid_code]:
+            try:
+                clear_code = render_func(code)
+                if clear_code:
+                    png_bytes = render_mermaid_to_png(clear_code)
+                    return base64.b64encode(png_bytes).decode(), True
+            except Exception as e:
+                logger.debug(f"Render attempt failed for {title}: {e}")
+        logger.exception(f'Error rendering diagram {title}')
+        return None, False
 
     @extend_schema(
         summary='Генерация или изменение набора Mermaid-диаграмм через ИИ-агента',
@@ -142,59 +154,76 @@ class MermaidAPIView(APIView):
             texts = payload.get("texts") or ([payload.get("text")] if payload.get("text") else [])
 
             if not isinstance(texts, list):
-                return JsonResponse({"error": "`texts` must be an array of strings"}, status=status.HTTP_400_BAD_REQUEST)
+                return JsonResponse({"error": "`texts` must be an array of strings"},
+                                    status=status.HTTP_400_BAD_REQUEST)
 
             if not token:
                 return Response({'error': 'The "token" fields are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # ============================================== Вызов агента ==============================================
-            # Инициализация пайплайна
+            # Initialize pipeline
             pipeline = TzPipeline(llm_callable=call_gigachat, embedding_model=self.local_embedding, llm=self.llm)
 
-            all_responses = AgentResponse.objects.filter(
-                token=token,
-                agent_id__in=[1, 2, 3, 4]
-            ).order_by('agent_id', '-created_at').distinct('agent_id')
+            # Gather responses for structured input
+            all_responses = AgentResponse.objects.filter(token=token, agent_id__in=[1, 2, 3, 4]).order_by('agent_id',
+                                                                                                          '-created_at').distinct(
+                'agent_id')
 
             structured_response = "Собранное техническое задание:\n\n"
-
             for resp in all_responses:
-                if resp.agent_id == 1:
-                    section = "1. Общее описание проекта:\n\n"
-                elif resp.agent_id == 2:
-                    section = "2. Цели и задачи проекта:\n\n"
-                elif resp.agent_id == 3:
-                    section = "3. Пользовательские группы:\n\n"
-                elif resp.agent_id == 4:
-                    section = "4. Требования и функционал:\n\n"
-
+                section = {
+                    1: "1. Общее описание проекта:\n\n",
+                    2: "2. Цели и задачи проекта:\n\n",
+                    3: "3. Пользовательские группы:\n\n",
+                    4: "4. Требования и функционал:\n\n"
+                }[resp.agent_id]
                 structured_response += f"{section}{resp.response}\n\n"
 
+            # Initial diagram generation
             all_diags = pipeline.generate_all_diagrams(structured_response, self.access_token, texts)
-            images_b64: list[str] = []
-            for title, code in all_diags.items():
-                # print(title, "\n\n\n", code)
-                try:
-                    png_bytes: bytes = render_mermaid_to_png(code)
-                    images_b64.append(base64.b64encode(png_bytes).decode())
-                except Exception as e:
-                    try:
-                        clear_code: str = sanitize_mermaid_code_2(code)
-                        # print("clear_code_2 \n\n", clear_code)
-                        if clear_code:
-                            png_bytes: bytes = render_mermaid_to_png(clear_code)
-                            images_b64.append(base64.b64encode(png_bytes).decode())
-                    except Exception as e:
-                        try:
-                            clear_code: str = sanitize_mermaid_code(code)
-                            # print("clear_code_1 \n\n", clear_code)
-                            if clear_code:
-                                png_bytes: bytes = render_mermaid_to_png(clear_code)
-                                images_b64.append(base64.b64encode(png_bytes).decode())
-                        except Exception as e:
-                            logger.exception(f'Error render_mermaid_to_png: {e}')
+            diagrams_dict = {}
+            failed_diagrams = []
 
-            # return Response(png_bytes_array, status=status.HTTP_200_OK, content_type='application/json')
+            # First pass: Try rendering all diagrams
+            for title, code in all_diags.items():
+                b64_image, success = self._render_diagram(title, code)
+                if success:
+                    diagrams_dict[title] = b64_image
+                else:
+                    failed_diagrams.append(title)
+
+            # Retry failed diagrams up to 3 times
+            retry_count = 3
+            while failed_diagrams and retry_count > 0:
+                logger.info(f'Retry attempt {4 - retry_count} for failed diagrams: {failed_diagrams}')
+                retry_count -= 1
+                try:
+                    all_diags = pipeline.generate_all_diagrams(structured_response, self.access_token, failed_diagrams)
+                except Exception as e:
+                    logger.exception(f'Error regenerating diagrams: {e}')
+                    break
+
+                new_failed_diagrams = []
+                for title in failed_diagrams:
+                    code = all_diags.get(title)
+                    if not code:
+                        logger.warning(f'Diagram {title} not found in regenerated diagrams')
+                        new_failed_diagrams.append(title)
+                        continue
+
+                    b64_image, success = self._render_diagram(title, code)
+                    if success:
+                        diagrams_dict[title] = b64_image
+                    else:
+                        new_failed_diagrams.append(title)
+
+                failed_diagrams = new_failed_diagrams
+
+            # Convert diagrams_dict to images_b64 list for response
+            images_b64 = list(diagrams_dict.values())
+
+            # Save or update MermaidImage object
+            MermaidImage.objects.update_or_create(token=token, defaults={'images_b64': diagrams_dict})
+
             return JsonResponse({"images": images_b64}, status=status.HTTP_200_OK)
 
         except SystemExit as se:
