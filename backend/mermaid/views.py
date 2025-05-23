@@ -177,7 +177,7 @@ class MermaidAPIView(APIView):
                     4: "4. Требования и функционал:\n\n"
                 }[resp.agent_id]
                 structured_response += f"{section}{resp.response}\n\n"
-            print(structured_response)  # delete================================================================
+
             # Initial diagram generation
             all_diags = pipeline.generate_all_diagrams(structured_response, self.access_token, texts)
             diagrams_dict = {}
