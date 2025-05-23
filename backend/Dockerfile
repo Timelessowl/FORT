@@ -7,6 +7,7 @@ WORKDIR /app
 
 COPY ./backend/requirements.txt /app/
 RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --upgrade torch sentence-transformers langchain-huggingface
 
 COPY ./backend/ /app/
 
