@@ -172,31 +172,59 @@ class MermaidAPIView(APIView):
                 structured_response += f"{section}{resp.response}\n\n"
 
             all_diags = pipeline.generate_all_diagrams(structured_response, self.access_token, texts)
-            images_b64: list[str] = []
+            diagrams_dict = {}
+            failed_diagrams: list[str] = []
+
             for title, code in all_diags.items():
-                # print(title, "\n\n\n", code)
                 try:
                     png_bytes: bytes = render_mermaid_to_png(code)
-                    images_b64.append(base64.b64encode(png_bytes).decode())
+                    diagrams_dict[title] = base64.b64encode(png_bytes).decode()
                 except Exception as e:
                     try:
                         clear_code: str = sanitize_mermaid_code_2(code)
-                        # print("clear_code_2 \n\n", clear_code)
                         if clear_code:
                             png_bytes: bytes = render_mermaid_to_png(clear_code)
-                            images_b64.append(base64.b64encode(png_bytes).decode())
+                            diagrams_dict[title] = base64.b64encode(png_bytes).decode()
                     except Exception as e:
                         try:
                             clear_code: str = sanitize_mermaid_code(code)
-                            # print("clear_code_1 \n\n", clear_code)
                             if clear_code:
                                 png_bytes: bytes = render_mermaid_to_png(clear_code)
-                                images_b64.append(base64.b64encode(png_bytes).decode())
+                                diagrams_dict[title] = base64.b64encode(png_bytes).decode()
                         except Exception as e:
-                            logger.exception(f'Error render_mermaid_to_png: {e}')
+                            failed_diagrams.append(title)
+                            logger.exception(f'Error render_mermaid_to_png for {title}')
 
-            MermaidImage.objects.update_or_create(token=token,defaults={'images_b64': images_b64})
-            # return Response(png_bytes_array, status=status.HTTP_200_OK, content_type='application/json')
+            retry_count = 3
+            while len(failed_diagrams) > 0 and retry_count > 0:
+                logger.info(f'Retry attempt {retry_count} for failed diagrams: {failed_diagrams}')
+
+                retry_count -= 1
+                all_diags = pipeline.generate_all_diagrams(structured_response, self.access_token, failed_diagrams)
+                failed_diagrams = []
+
+                for title, code in all_diags.items():
+                    try:
+                        png_bytes: bytes = render_mermaid_to_png(code)
+                        diagrams_dict[title] = base64.b64encode(png_bytes).decode()
+                    except Exception as e:
+                        try:
+                            clear_code: str = sanitize_mermaid_code_2(code)
+                            if clear_code:
+                                png_bytes: bytes = render_mermaid_to_png(clear_code)
+                                diagrams_dict[title] = base64.b64encode(png_bytes).decode()
+                        except Exception as e:
+                            try:
+                                clear_code: str = sanitize_mermaid_code(code)
+                                if clear_code:
+                                    png_bytes: bytes = render_mermaid_to_png(clear_code)
+                                    diagrams_dict[title] = base64.b64encode(png_bytes).decode()
+                            except Exception as e:
+                                failed_diagrams.append(title)
+                                logger.exception(f'Retry {retry_count} failed for {title}')
+
+            images_b64 = list(diagrams_dict.values())
+            MermaidImage.objects.update_or_create(token=token, defaults={'images_b64': diagrams_dict})
             return JsonResponse({"images": images_b64}, status=status.HTTP_200_OK)
 
         except SystemExit as se:
