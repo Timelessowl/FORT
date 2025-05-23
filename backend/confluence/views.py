@@ -1,19 +1,111 @@
+from django.conf import settings
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
+from markdown import markdown
 from atlassian import Confluence
 import logging
 import requests
-import re
-from django.conf import settings
 
 from chat.models import AgentResponse
+from mermaid.models import MermaidImage
 
 logger = logging.getLogger(__name__)
 
 
 class ConfluenceApiView(APIView):
+    # Constants
+    ERROR_MISSING_TOKEN = {'error': 'Missing required field: token'}
+    ERROR_CONFLUENCE_CONFIG = {'error': 'Confluence access configuration error'}
+    ERROR_NO_PERMISSIONS = {'error': 'User has no permissions to create pages in Confluence'}
+    ERROR_PAGE_CREATION = {'error': 'Failed to create/update Confluence page'}
+    ERROR_SERVER = {'error': 'Internal Server Error'}
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.confluence_url = settings.CONFLUENCE_URL
+        self.confluence_username = settings.CONFLUENCE_USERNAME
+        self.confluence_api_token = settings.CONFLUENCE_API_TOKEN
+        self.confluence_space_key = settings.CONFLUENCE_SPACE_KEY
+
+    def _get_confluence_client(self) -> Confluence | None:
+        """Initialize and validate Confluence client."""
+        try:
+            client = Confluence(
+                url=self.confluence_url,
+                username=self.confluence_username,
+                password=self.confluence_api_token,
+                cloud=True
+            )
+            # Validate space access
+            if not client.get_space(self.confluence_space_key):
+                logger.error(f"Space {self.confluence_space_key} not found")
+                return None
+            return client
+        except Exception as e:
+            logger.error(f"Confluence connection error: {e}")
+            return None
+
+    def _create_or_update_page(self, confluence: Confluence, title: str, content: str, parent_id: str = None) -> dict:
+        """Create or update a Confluence page."""
+        existing_page = confluence.get_page_by_title(space=self.confluence_space_key, title=title)
+        if existing_page:
+            return confluence.update_page(
+                page_id=existing_page['id'],
+                title=title,
+                body=content,
+                parent_id=parent_id,
+                type='page',
+                representation='storage'
+            )
+        return confluence.create_page(
+            space=self.confluence_space_key,
+            title=title,
+            body=content,
+            parent_id=parent_id,
+            type='page',
+            representation='storage'
+        )
+
+    def _generate_confluence_html(self, responses, token: str) -> str:
+        """Generate HTML content for Confluence with responses and diagrams."""
+        sections = {
+            1: "1. Общее описание проекта",
+            2: "2. Цели и задачи проекта",
+            3: "3. Пользовательские группы",
+            4: "4. Требования и функционал"
+        }
+        html_content = """
+            <h1>Техническое задание</h1>
+            <p><em>Этот документ был автоматически сгенерирован системой.</em></p>
+            """
+
+        # Add response sections
+        for resp in responses:
+            if resp.agent_id in sections:
+                html_content += f"""
+                    <h2>{sections[resp.agent_id]}</h2>
+                    <div class="rich-text-section">{markdown(resp.response)}</div>
+                    """
+
+        # Add diagram section
+        try:
+            mermaid_image = MermaidImage.objects.get(token=token)
+            images_b64 = mermaid_image.images_b64 or {}
+            if images_b64:
+                html_content += '<h2>Mermaid Диаграммы</h2>'
+                for title, b64_image in images_b64.items():
+                    html_content += f"""
+                        <h3>{title}</h3>
+                        <img src="data:image/png;base64,{b64_image}" alt="{title}" style="max-width: 100%;">
+                        """
+            else:
+                logger.info(f"No diagrams found for token {token}")
+        except MermaidImage.DoesNotExist:
+            logger.info(f"No MermaidImage found for token {token}")
+
+        return html_content
 
     @extend_schema(
         summary='Создание страницы ТЗ в Confluence',
@@ -157,152 +249,40 @@ class ConfluenceApiView(APIView):
         }
     )
     def post(self, request):
+        # Validate token
+        token = request.data.get('token')
+        if not token:
+            return Response(self.ERROR_MISSING_TOKEN, status=status.HTTP_400_BAD_REQUEST)
+
+        # Initialize Confluence client
+        confluence = self._get_confluence_client()
+        if not confluence:
+            return Response(self.ERROR_CONFLUENCE_CONFIG, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Fetch agent responses
+        responses = AgentResponse.objects.filter(token=token, agent_id__in=[1, 2, 3, 4]).order_by('agent_id', '-created_at').distinct('agent_id')
+
+        # Generate HTML content with diagrams
         try:
-            token = request.data.get('token')
-            if not token:
-                return Response({'error': 'Missing required field: token'}, status=status.HTTP_400_BAD_REQUEST)
-            self.CONFLUENCE_URL        = settings.CONFLUENCE_URL
-            self.CONFLUENCE_USERNAME   = settings.CONFLUENCE_USERNAME
-            self.CONFLUENCE_API_TOKEN  = settings.CONFLUENCE_API_TOKEN
-            self.CONFLUENCE_SPACE_KEY  = settings.CONFLUENCE_SPACE_KEY
-            confluence = self.get_confluence_client()
-            if not confluence:
-                return Response({'error': 'Confluence access configuration error'},
-                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            html_content = self._generate_confluence_html(responses, token)
+        except Exception as e:
+            logger.exception(f"Error generating HTML content: {e}")
+            return Response(self.ERROR_SERVER, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            if not self.check_confluence_permissions(confluence):
-                return Response({'error': 'User has no permissions to create pages in Confluence'},
-                                status=status.HTTP_403_FORBIDDEN)
-
-            all_responses = AgentResponse.objects.filter(token=token, agent_id__in=[1, 2, 3, 4]).order_by('agent_id',
-                                                                                                          '-created_at').distinct(
-                'agent_id')
-
-            # if not all_responses.exists():
-            #     return Response({'error': 'No technical specification found for this token'},
-            #                     status=status.HTTP_404_NOT_FOUND)
-            #
+        # Create or update Confluence page
+        try:
             page_title = f"Техническое задание [token: {token}]"
-            html_content = self.generate_confluence_html(all_responses)
+            result = self._create_or_update_page(confluence, page_title, html_content)
+            page_url = f"{self.confluence_url}{result['_links']['webui']}"
 
-            try:
-                result = self.create_or_update_page(confluence, page_title, html_content)
+            page_id = result['id']
+            rendered = confluence.get_page_by_id(page_id, expand="body.view")
+            html_view = rendered["body"]["view"]["value"]
 
-                page_url = f"{self.CONFLUENCE_URL}{result['_links']['webui']}"
-                page_id = result['id']
-                rendered = confluence.get_page_by_id(
-                    page_id,
-                    expand="body.view"
-                )
-                html_view = rendered["body"]["view"]["value"]
-
-                return Response({'page_url': page_url, 'page_id': page_id, 'html': html_view}, status=status.HTTP_200_OK)
-
-            except requests.exceptions.HTTPError as http_err:
-                logger.error(f"Confluence API error: {http_err}")
-                return Response({'error': 'Failed to create/update Confluence page'},
-                                status=status.HTTP_502_BAD_GATEWAY)
-
+            return Response({'page_url': page_url, 'page_id': page_id, 'html': html_view}, status=status.HTTP_200_OK)
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"Confluence API error: {e}")
+            return Response(self.ERROR_PAGE_CREATION, status=status.HTTP_502_BAD_GATEWAY)
         except Exception as e:
-            logger.exception(f'Error creating Confluence page: {e}')
-            return Response({'error': 'Internal Server Error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    def get_confluence_client(self):
-        """Создает и возвращает клиент Confluence с проверкой подключения"""
-        try:
-            confluence = Confluence(url=self.CONFLUENCE_URL, username=self.CONFLUENCE_USERNAME,
-                                    password=self.CONFLUENCE_API_TOKEN, cloud=True)
-
-            confluence.get_space(self.CONFLUENCE_SPACE_KEY)
-            return confluence
-        except Exception as e:
-            logger.error(f"Confluence connection error: {e}")
-            return None
-
-    def check_confluence_permissions(self, confluence):
-        """Проверяет, есть ли у пользователя права на создание страниц"""
-        try:
-            space = confluence.get_space(self.CONFLUENCE_SPACE_KEY)
-            if not space:
-                return False
-
-            return True
-        except Exception as e:
-            logger.error(f"Permission check error: {e}")
-            return False
-
-    def create_or_update_page(self, confluence, title, content, parent_id=None):
-        """Создает или обновляет страницу в Confluence"""
-        existing_page = confluence.get_page_by_title(space=self.CONFLUENCE_SPACE_KEY, title=title)
-
-        if existing_page:
-            return confluence.update_page(page_id=existing_page['id'], title=title, body=content, parent_id=parent_id,
-                                          type='page', representation='storage')
-        else:
-            return confluence.create_page(space=self.CONFLUENCE_SPACE_KEY, title=title, body=content,
-                                          parent_id=parent_id, type='page', representation='storage')
-
-    def generate_confluence_html(self, responses):
-        """Генерирует HTML контент для Confluence с поддержкой Markdown."""
-        html_content = """
-        <h1>Техническое задание</h1>
-        <p><em>Этот документ был автоматически сгенерирован системой.</em></p>
-        """
-
-        sections = {
-            1: "1. Общее описание проекта",
-            2: "2. Цели и задачи проекта",
-            3: "3. Пользовательские группы",
-            4: "4. Требования и функционал"
-        }
-
-        for resp in responses:
-            if resp.agent_id not in sections:
-                continue
-
-            response_html = self._process_markdown(resp.response)
-
-            html_content += f"""
-            <h2>{sections[resp.agent_id]}</h2>
-            <div class="rich-text-section">
-                {response_html}
-            </div>
-            """
-
-        return html_content
-
-    def _process_markdown(self, text):
-        """Обрабатывает Markdown в тексте и преобразует в HTML."""
-        # Замена **текст** на <strong>текст</strong>
-        text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', text)
-
-        # Замена --- на <hr>
-        text = re.sub(r'^---\s*$', '<hr>', text, flags=re.MULTILINE)
-
-        # Обработка заголовков (### Текст → <h1>–<h6>)
-        def replace_heading(match):
-            level = len(match.group(1))  # Количество решеток (1–6)
-            text = match.group(2).strip()
-            if 1 <= level <= 6:
-                return f'<h{level}>{text}</h{level}>'
-            return match.group(0)
-
-        text = re.sub(r'^(#{1,6})\s+(.+)$', replace_heading, text, flags=re.MULTILINE)
-
-        # Замена переносов строк на HTML
-        # Двойной перенос (\n\n) → новый параграф
-        paragraphs = text.split('\n\n')
-        response_html = ''
-        for paragraph in paragraphs:
-            if paragraph.strip():
-                # Если строка уже является <hr> или <h1>–<h6>, не оборачиваем в <p>
-                if paragraph.startswith('<hr>') or re.match(r'^<h[1-6]>.+</h[1-6]>$', paragraph):
-                    response_html += paragraph
-                else:
-                    # Одинарный перенос (\n) → <br>
-                    paragraph = paragraph.replace('\n', '<br>')
-                    response_html += f'<p>{paragraph}</p>'
-            else:
-                response_html += '<p></p>'
-
-        return response_html
+            logger.exception(f"Error creating Confluence page: {e}")
+            return Response(self.ERROR_SERVER, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
