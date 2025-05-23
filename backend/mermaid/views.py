@@ -13,6 +13,7 @@ from langchain_gigachat.chat_models import GigaChat
 from langchain_huggingface import HuggingFaceEmbeddings
 
 from chat.models import AgentResponse
+from mermaid.models import MermaidImage
 from utils.mermaid_renderer import render_mermaid_to_png, MermaidRenderError
 from utils.dfd_generator import get_access_token, generate_mermaid_dfd_from_description
 from mermaid.serializer import MermaidRequestSerializer, ErrorResponseSerializer
@@ -194,6 +195,7 @@ class MermaidAPIView(APIView):
                         except Exception as e:
                             logger.exception(f'Error render_mermaid_to_png: {e}')
 
+            MermaidImage.objects.update_or_create(token=token,defaults={'images_b64': images_b64})
             # return Response(png_bytes_array, status=status.HTTP_200_OK, content_type='application/json')
             return JsonResponse({"images": images_b64}, status=status.HTTP_200_OK)
 
