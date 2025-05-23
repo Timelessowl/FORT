@@ -7,7 +7,8 @@ WORKDIR /app
 
 COPY ./backend/requirements.txt /app/
 RUN pip install --upgrade pip && pip install -r requirements.txt
-RUN pip install --upgrade torch sentence-transformers langchain-huggingface
+RUN pip install --upgrade torch sentence-transformers langchain-huggingface transformers
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/paraphrase-multilingual-mpnet-base-v2')"
 
 COPY ./backend/ /app/
 

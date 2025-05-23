@@ -6,12 +6,14 @@ import logging
 import uuid
 import environ
 import base64
+import torch
 import os
 from langchain_gigachat.chat_models import GigaChat
 from langchain_huggingface import HuggingFaceEmbeddings
 
 from chat.models import AgentResponse
 from chat.serializer import ChatResponseSerializer, ErrorResponseSerializer
+from sentence_transformers import SentenceTransformer
 from utils.tz_critic_agent2 import get_access_token, TzPipeline, call_gigachat
 
 logger = logging.getLogger(__name__)
@@ -38,9 +40,16 @@ class ChatAPIView(APIView):
             scope="GIGACHAT_API_PERS",
             verify_ssl_certs=False,
         )
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
         model_name = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
-        model_kwargs = {"device": "cpu"}
+        model_kwargs = {"device": device}
         encode_kwargs = {"normalize_embeddings": False}
+
+        try:
+            model = SentenceTransformer(model_name_or_path=model_name, device=device)
+        except Exception as e:
+            logger.exception(f"Error loading embedding model: {e}")
+
         self.local_embedding = HuggingFaceEmbeddings(
             model_name=model_name,
             model_kwargs=model_kwargs,
