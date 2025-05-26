@@ -79,6 +79,12 @@ const GenerateConfluence: FC = () => {
           {loading ? "Создание…" : "Сгенерировать страницу Confluence"}
         </Button>
       )}
+      {html && (
+        <div
+          className="prose max-h-96 w-full overflow-auto rounded-lg border p-4"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      )}
 
       {pageUrl && (
         <a
@@ -92,12 +98,6 @@ const GenerateConfluence: FC = () => {
         </a>
       )}
 
-      {html && (
-        <div
-          className="prose max-h-96 w-full overflow-auto rounded-lg border p-4"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      )}
     </div>
   );
 };
@@ -137,10 +137,6 @@ export const Thread: FC<{ stageIndex: number }> = ({ stageIndex }) => {
           <div className="min-h-8 flex-grow" />
         </ThreadPrimitive.If>
 
-        { /*<div className="sticky bottom-0 mt-3 flex w-full max-w-[var(--thread-max-width)] flex-col items-center justify-end rounded-t-lg bg-inherit pb-4">
-          <ThreadScrollToBottom />
-          <Composer isImageMode={isImageMode} handleToggle={handleToggle} stageIndex={stageIndex} />
-        </div> */}
        {stageIndex < 5 && (
           <div className="sticky bottom-0 mt-3 flex w-full max-w-[var(--thread-max-width)] flex-col items-center justify-end rounded-t-lg bg-inherit pb-4">
             <ThreadScrollToBottom />
@@ -179,7 +175,7 @@ const ThreadWelcome: FC<{ stageIndex: number }> = ({ stageIndex }) => {
         <div className="flex w-full flex-grow flex-col items-center justify-center">
           {stageIndex === 4 ? 
               <p className="mt-4 font-medium whitespace-pre-line">{ThreadBackgroundMessage}</p>
-              : <p className="mt-4 font-medium">Фигово описали, разберемся потом :) </p> } 
+              : stageIndex != 5 && (<p className="mt-4 font-medium">Фигово описали, разберемся потом :) </p>) } 
         </div>
         { /*<ThreadWelcomeSuggestions />*/ }
       </div>
